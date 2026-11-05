@@ -274,7 +274,8 @@ mod tests {
         );
         assert_eq!((st, loc.as_str()), ("201 Created", "Location: 1\r\n"));
         let mut body = String::new();
-        for _ in 0..100 {
+        // up to 10s: on Windows a refused localhost connect takes ~2s (SYN retries)
+        for _ in 0..500 {
             body = route("GET", "/v0.1/scan/1", "", "", &tasks, &state).2;
             if body.contains("\"succeeded\"") {
                 break;

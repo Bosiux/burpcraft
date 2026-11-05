@@ -771,7 +771,7 @@ pub fn links(base_path: &str, html: &str, t: &Target) -> (Vec<String>, Vec<Strin
         } else {
             format!(
                 "{}{u}",
-                &base_path[..base_path.rfind('/').map_or(0, |i| i + 1)]
+                base_path[..base_path.rfind('/').map_or(0, |i| i + 1)]
                     .trim_end_matches(|c| c != '/')
             )
         })
