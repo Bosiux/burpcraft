@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/brand/burpcraft-icon-256.png" width="128" height="128" alt="BurpCraft icon: a request arrow caught in a target reticle on an orange tile">
+  <img src="docs/brand/burpcraft-icon-256.png" width="128" height="128" alt="BurpCraft icon: a white crab on an orange tile">
 </p>
 
 <h1 align="center">BurpCraft</h1>
