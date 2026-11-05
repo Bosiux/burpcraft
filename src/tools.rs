@@ -184,11 +184,12 @@ impl Repeater {
         if let Some((h, p, tls)) = &mut self.editing_target {
             let mut open = true;
             let mut done = false;
-            egui::Window::new("Configure target details")
-                .collapsible(false)
-                .resizable(false)
-                .open(&mut open)
-                .show(ui.ctx(), |ui| {
+            theme::window(
+                ui.ctx(),
+                "Configure target details",
+                [420.0, 200.0],
+                &mut open,
+                |ui| {
                     ui.label(
                         "Specify the details of the server to which the request will be sent.",
                     );
@@ -206,7 +207,8 @@ impl Repeater {
                             done = true;
                         }
                     });
-                });
+                },
+            );
             if done {
                 t.host = h.trim().to_string();
                 t.port = p.trim().parse().unwrap_or(if *tls { 443 } else { 80 });
@@ -605,47 +607,52 @@ impl Comparer {
         }
         if let Some((words, l, r)) = &self.result {
             let mut open = true;
-            egui::Window::new(if *words {
-                "Word compare"
-            } else {
-                "Byte compare"
-            })
-            .open(&mut open)
-            .default_size([900.0, 600.0])
-            .show(ui.ctx(), |ui| {
-                ui.horizontal(|ui| {
-                    ui.label("Key:");
-                    for (t, n) in [
-                        (Tag::Modified, "Modified"),
-                        (Tag::Deleted, "Deleted"),
-                        (Tag::Added, "Added"),
-                    ] {
-                        ui.label(RichText::new(format!(" {n} ")).background_color(tag_color(t)));
-                    }
-                });
-                ui.columns(2, |cols| {
-                    for (c, side) in cols.iter_mut().zip([l, r]) {
-                        egui::ScrollArea::both()
-                            .id_salt(c.scope_id())
-                            .show(c, |ui| {
-                                let mut job = egui::text::LayoutJob::default();
-                                for (t, s) in side {
-                                    job.append(
-                                        s,
-                                        0.0,
-                                        egui::TextFormat {
-                                            font_id: egui::FontId::monospace(13.0),
-                                            color: theme::text(),
-                                            background: tag_color(*t),
-                                            ..Default::default()
-                                        },
-                                    );
-                                }
-                                ui.label(job);
-                            });
-                    }
-                });
-            });
+            theme::window(
+                ui.ctx(),
+                if *words {
+                    "Word compare"
+                } else {
+                    "Byte compare"
+                },
+                [900.0, 600.0],
+                &mut open,
+                |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label("Key:");
+                        for (t, n) in [
+                            (Tag::Modified, "Modified"),
+                            (Tag::Deleted, "Deleted"),
+                            (Tag::Added, "Added"),
+                        ] {
+                            ui.label(
+                                RichText::new(format!(" {n} ")).background_color(tag_color(t)),
+                            );
+                        }
+                    });
+                    ui.columns(2, |cols| {
+                        for (c, side) in cols.iter_mut().zip([l, r]) {
+                            egui::ScrollArea::both()
+                                .id_salt(c.scope_id())
+                                .show(c, |ui| {
+                                    let mut job = egui::text::LayoutJob::default();
+                                    for (t, s) in side {
+                                        job.append(
+                                            s,
+                                            0.0,
+                                            egui::TextFormat {
+                                                font_id: egui::FontId::monospace(13.0),
+                                                color: theme::text(),
+                                                background: tag_color(*t),
+                                                ..Default::default()
+                                            },
+                                        );
+                                    }
+                                    ui.label(job);
+                                });
+                        }
+                    });
+                },
+            );
             if !open {
                 self.result = None;
             }

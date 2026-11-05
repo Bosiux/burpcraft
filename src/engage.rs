@@ -427,91 +427,88 @@ impl Engage {
             return;
         }
         let mut open = true;
-        egui::Window::new("Engagement tools")
-            .open(&mut open)
-            .default_size([820.0, 520.0])
-            .show(ctx, |ui| {
-                ui.strong(&self.title);
-                ui.separator();
-                if let Some(d) = &self.discovery {
-                    let done = d.done.load(Ordering::SeqCst);
-                    ui.horizontal(|ui| {
-                        ui.add(
-                            egui::ProgressBar::new(done as f32 / d.total.max(1) as f32)
-                                .text(format!("{done} of {} requests", d.total))
-                                .desired_width(300.0),
-                        );
-                        if done < d.total && ui.button("Stop").clicked() {
-                            d.stop.store(true, Ordering::SeqCst);
-                        }
-                    });
-                    ui.label("Extra words (one per line, used on the next run):");
+        crate::theme::window(ctx, "Engagement tools", [820.0, 520.0], &mut open, |ui| {
+            ui.strong(&self.title);
+            ui.separator();
+            if let Some(d) = &self.discovery {
+                let done = d.done.load(Ordering::SeqCst);
+                ui.horizontal(|ui| {
                     ui.add(
-                        egui::TextEdit::multiline(&mut self.wordlist)
-                            .desired_rows(2)
-                            .desired_width(400.0),
+                        egui::ProgressBar::new(done as f32 / d.total.max(1) as f32)
+                            .text(format!("{done} of {} requests", d.total))
+                            .desired_width(300.0),
                     );
-                    let found = d.found.lock().unwrap();
-                    ui.label(format!(
-                        "{} found (soft-404 responses filtered out)",
-                        found.len()
-                    ));
-                    egui::ScrollArea::vertical().show(ui, |ui| {
-                        egui::Grid::new("disc")
-                            .striped(true)
-                            .num_columns(3)
-                            .show(ui, |ui| {
-                                for (s, l, u) in found.iter() {
-                                    ui.label(s.to_string());
-                                    ui.label(l.to_string());
-                                    ui.monospace(u);
-                                    ui.end_row();
-                                }
-                            });
-                    });
-                    if done < d.total {
-                        ui.ctx()
-                            .request_repaint_after(std::time::Duration::from_millis(200));
+                    if done < d.total && ui.button("Stop").clicked() {
+                        d.stop.store(true, Ordering::SeqCst);
                     }
-                } else if !self.text.is_empty() {
-                    let csrf = self.text.starts_with("<html>");
-                    if csrf {
-                        ui.horizontal(|ui| {
-                            if ui.button("Copy HTML").clicked() {
-                                ui.ctx().copy_text(self.text.clone());
-                            }
-                            if ui.button("Test in browser").clicked() {
-                                let _ = crate::render::open_in_browser(&self.text, None);
+                });
+                ui.label("Extra words (one per line, used on the next run):");
+                ui.add(
+                    egui::TextEdit::multiline(&mut self.wordlist)
+                        .desired_rows(2)
+                        .desired_width(400.0),
+                );
+                let found = d.found.lock().unwrap();
+                ui.label(format!(
+                    "{} found (soft-404 responses filtered out)",
+                    found.len()
+                ));
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    egui::Grid::new("disc")
+                        .striped(true)
+                        .num_columns(3)
+                        .show(ui, |ui| {
+                            for (s, l, u) in found.iter() {
+                                ui.label(s.to_string());
+                                ui.label(l.to_string());
+                                ui.monospace(u);
+                                ui.end_row();
                             }
                         });
-                    }
-                    egui::ScrollArea::vertical().show(ui, |ui| {
-                        ui.add(
-                            egui::TextEdit::multiline(&mut self.text)
-                                .code_editor()
-                                .desired_width(f32::INFINITY),
-                        );
-                    });
-                } else {
-                    ui.label(format!(
-                        "{} result{}",
-                        self.rows.len(),
-                        if self.rows.len() == 1 { "" } else { "s" }
-                    ));
-                    egui::ScrollArea::vertical().show(ui, |ui| {
-                        egui::Grid::new("eng")
-                            .striped(true)
-                            .num_columns(2)
-                            .show(ui, |ui| {
-                                for (u, v) in &self.rows {
-                                    ui.monospace(u);
-                                    ui.label(v);
-                                    ui.end_row();
-                                }
-                            });
+                });
+                if done < d.total {
+                    ui.ctx()
+                        .request_repaint_after(std::time::Duration::from_millis(200));
+                }
+            } else if !self.text.is_empty() {
+                let csrf = self.text.starts_with("<html>");
+                if csrf {
+                    ui.horizontal(|ui| {
+                        if ui.button("Copy HTML").clicked() {
+                            ui.ctx().copy_text(self.text.clone());
+                        }
+                        if ui.button("Test in browser").clicked() {
+                            let _ = crate::render::open_in_browser(&self.text, None);
+                        }
                     });
                 }
-            });
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    ui.add(
+                        egui::TextEdit::multiline(&mut self.text)
+                            .code_editor()
+                            .desired_width(f32::INFINITY),
+                    );
+                });
+            } else {
+                ui.label(format!(
+                    "{} result{}",
+                    self.rows.len(),
+                    if self.rows.len() == 1 { "" } else { "s" }
+                ));
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    egui::Grid::new("eng")
+                        .striped(true)
+                        .num_columns(2)
+                        .show(ui, |ui| {
+                            for (u, v) in &self.rows {
+                                ui.monospace(u);
+                                ui.label(v);
+                                ui.end_row();
+                            }
+                        });
+                });
+            }
+        });
         self.open = open;
         if !open && let Some(d) = &self.discovery {
             d.stop.store(true, Ordering::SeqCst);

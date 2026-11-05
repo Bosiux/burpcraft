@@ -310,7 +310,7 @@ impl Sequencer {
         let mut open = true;
         let Some(r) = &self.report else { return };
         let tab = &mut self.report_tab;
-        egui::Window::new("Sequencer analysis").open(&mut open).default_size([800.0, 560.0]).show(ctx, |ui| {
+        theme::window(ctx, "Sequencer analysis", [800.0, 560.0], &mut open, |ui| {
             ui.horizontal(|ui| {
                 for t in ["Summary", "Character-level analysis", "Bit-level analysis"] {
                     if theme::sub_tab(ui, *tab == t, t).clicked() {

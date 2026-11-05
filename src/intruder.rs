@@ -862,37 +862,60 @@ impl Intruder {
                 continue;
             }
             let mut open = true;
-            egui::Window::new(format!("Intruder attack {}", a.title)).id(egui::Id::unique(("attack", k))).open(&mut open).default_size([1000.0, 700.0]).show(ctx, |ui| {
-                let rows = a.rows.lock().unwrap();
-                let done = rows.len();
-                ui.horizontal(|ui| {
-                    let finished = done >= a.total || a.stop.load(Ordering::SeqCst);
-                    if ui.add_enabled(!finished, egui::Button::new("Pause / stop")).clicked() {
-                        a.stop.store(true, Ordering::SeqCst);
-                    }
-                    ui.label(if finished { "Finished".to_string() } else { "Attack running".into() });
-                    ui.add(egui::ProgressBar::new(done as f32 / a.total.max(1) as f32).text(format!("{done} of {}", a.total)).desired_width(300.0));
-                });
-                ui.separator();
-                let npay = rows.iter().map(|r| r.payloads.len()).max().unwrap_or(1).max(1);
-                let mut order: Vec<usize> = (0..rows.len()).collect();
-                if let Some((col, asc)) = a.sort {
-                    order.sort_by(|&x, &y| {
-                        let (x, y) = (&rows[x], &rows[y]);
-                        let o = match col {
-                            0 => x.n.cmp(&y.n),
-                            1 => x.status.cmp(&y.status),
-                            2 => x.millis.cmp(&y.millis),
-                            3 => x.len.cmp(&y.len),
-                            c => x.grep.get(c - 4).cmp(&y.grep.get(c - 4)),
-                        };
-                        if asc { o } else { o.reverse() }
+            theme::window(
+                ctx,
+                &format!("Intruder attack {}", a.title),
+                [1000.0, 700.0],
+                &mut open,
+                |ui| {
+                    let rows = a.rows.lock().unwrap();
+                    let done = rows.len();
+                    ui.horizontal(|ui| {
+                        let finished = done >= a.total || a.stop.load(Ordering::SeqCst);
+                        if ui
+                            .add_enabled(!finished, egui::Button::new("Pause / stop"))
+                            .clicked()
+                        {
+                            a.stop.store(true, Ordering::SeqCst);
+                        }
+                        ui.label(if finished {
+                            "Finished".to_string()
+                        } else {
+                            "Attack running".into()
+                        });
+                        ui.add(
+                            egui::ProgressBar::new(done as f32 / a.total.max(1) as f32)
+                                .text(format!("{done} of {}", a.total))
+                                .desired_width(300.0),
+                        );
                     });
-                }
-                let sel = a.selected.and_then(|n| rows.iter().find(|r| r.n == n));
-                let (req, resp) = sel.map(|r| (r.req.clone(), r.resp.clone())).unwrap_or_default();
-                let h = ui.available_height();
-                egui::Panel::top(("res_tbl", k)).resizable(true).default_size(h * 0.5).show(ui, |ui| {
+                    ui.separator();
+                    let npay = rows
+                        .iter()
+                        .map(|r| r.payloads.len())
+                        .max()
+                        .unwrap_or(1)
+                        .max(1);
+                    let mut order: Vec<usize> = (0..rows.len()).collect();
+                    if let Some((col, asc)) = a.sort {
+                        order.sort_by(|&x, &y| {
+                            let (x, y) = (&rows[x], &rows[y]);
+                            let o = match col {
+                                0 => x.n.cmp(&y.n),
+                                1 => x.status.cmp(&y.status),
+                                2 => x.millis.cmp(&y.millis),
+                                3 => x.len.cmp(&y.len),
+                                c => x.grep.get(c - 4).cmp(&y.grep.get(c - 4)),
+                            };
+                            if asc { o } else { o.reverse() }
+                        });
+                    }
+                    let sel = a.selected.and_then(|n| rows.iter().find(|r| r.n == n));
+                    let (req, resp) = sel
+                        .map(|r| (r.req.clone(), r.resp.clone()))
+                        .unwrap_or_default();
+                    let h = ui.available_height();
+                    egui::Panel::top(("res_tbl", k)).resizable(true).default_size(h * 0.5).show(ui, |ui| {
                     let mut tb = TableBuilder::new(ui).id_salt(("res", k)).striped(true).sense(egui::Sense::click()).resizable(true);
                     tb = tb.column(Column::initial(70.0));
                     for _ in 0..npay {
@@ -963,10 +986,11 @@ impl Intruder {
                         });
                     });
                 });
-                drop(rows);
-                let (mut req, mut resp) = (req, resp);
-                crate::editor::split(ui, ("ares_req", k), &mut req, false, &mut resp, None);
-            });
+                    drop(rows);
+                    let (mut req, mut resp) = (req, resp);
+                    crate::editor::split(ui, ("ares_req", k), &mut req, false, &mut resp, None);
+                },
+            );
             if !open {
                 a.open = false;
                 a.stop.store(true, Ordering::SeqCst);
