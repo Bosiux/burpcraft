@@ -86,6 +86,26 @@ impl Client {
 }
 
 /// Fetches new interactions; returns how many arrived.
+/// Starts burpcraft-server inside the app on localhost (HTTP, path-based payloads) and points the client at it.
+pub fn start_builtin() -> Result<String, String> {
+    let mut c = client().lock().unwrap();
+    if let Some(r) = &c.embedded {
+        return Ok(format!("127.0.0.1:{}", r.http_port));
+    }
+    let r = burpcraft_server::start(burpcraft_server::Config {
+        http_port: 0,
+        ..Default::default()
+    })
+    .map_err(|e| format!("Failed to start server: {e}"))?;
+    (c.server, c.domain, c.secret) = (
+        format!("127.0.0.1:{}", r.http_port),
+        String::new(),
+        String::new(),
+    );
+    c.embedded = Some(r);
+    Ok(c.server.clone())
+}
+
 pub fn poll() -> Result<usize, String> {
     let (server, biid, secret) = {
         let c = client().lock().unwrap();
@@ -194,14 +214,9 @@ impl Tab {
                     }
                     None => {
                         if ui.button("Start built-in server").on_hover_text("Runs burpcraft-server inside the app on localhost (HTTP, path-based payloads) for testing").clicked() {
-                            match burpcraft_server::start(burpcraft_server::Config { http_port: 0, ..Default::default() }) {
-                                Ok(r) => {
-                                    let mut c = client().lock().unwrap();
-                                    (c.server, c.domain, c.secret) = (format!("127.0.0.1:{}", r.http_port), String::new(), String::new());
-                                    (self.server, self.domain, self.secret) = (c.server.clone(), String::new(), String::new());
-                                    c.embedded = Some(r);
-                                }
-                                Err(e) => client().lock().unwrap().error = format!("Failed to start server: {e}"),
+                            match start_builtin() {
+                                Ok(srv) => (self.server, self.domain, self.secret) = (srv, String::new(), String::new()),
+                                Err(e) => client().lock().unwrap().error = e,
                             }
                         }
                     }

@@ -368,6 +368,8 @@ pub struct Shared {
     pub listener: Option<u16>,
     pub ctx: Option<eframe::egui::Context>,
     pub next_id: usize,
+    /// Items the MCP server asked the UI to open: (entry action, item).
+    pub ui_cmds: Vec<(&'static str, Entry)>,
 }
 
 pub type State = Arc<Mutex<Shared>>;
@@ -396,6 +398,7 @@ impl Shared {
             listener: None,
             ctx: None,
             next_id: 1,
+            ui_cmds: Vec::new(),
         }))
     }
     pub fn event(&mut self, source: &str, msg: impl Into<String>) {
