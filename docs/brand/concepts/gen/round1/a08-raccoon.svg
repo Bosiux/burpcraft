@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"><title>Raccoon</title><defs><linearGradient id="o" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff8a3d"/><stop offset="1" stop-color="#d9480f"/></linearGradient></defs><rect x="8" y="8" width="240" height="240" rx="56" fill="url(#o)"/><!-- ears -->
+<circle cx="80" cy="84" r="20" fill="#fff"/><circle cx="176" cy="84" r="20" fill="#fff"/>
+<!-- rounded head -->
+<path d="M128 70 C84 70 66 104 66 140 C66 182 94 204 128 204 C162 204 190 182 190 140 C190 104 172 70 128 70 Z" fill="#fff"/>
+<!-- bandit mask = hacker -->
+<path d="M72 128 C96 112 160 112 184 128 C182 150 168 158 156 152 C150 148 146 140 128 140 C110 140 106 148 100 152 C88 158 74 150 72 128 Z" fill="#7a2a06"/>
+<!-- eyes inside mask knocked to white then pupil -->
+<circle cx="102" cy="134" r="9" fill="#fff"/><circle cx="154" cy="134" r="9" fill="#fff"/>
+<circle cx="102" cy="134" r="4" fill="#7a2a06"/><circle cx="154" cy="134" r="4" fill="#7a2a06"/>
+<!-- snout + nose -->
+<path d="M128 150 C116 150 110 178 128 190 C146 178 140 150 128 150 Z" fill="url(#o)"/>
+<ellipse cx="128" cy="164" rx="9" ry="7" fill="#7a2a06"/>
+</svg>

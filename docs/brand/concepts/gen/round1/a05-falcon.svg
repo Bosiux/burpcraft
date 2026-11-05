@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"><title>Falcon</title><defs><linearGradient id="o" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff8a3d"/><stop offset="1" stop-color="#d9480f"/></linearGradient></defs><rect x="8" y="8" width="240" height="240" rx="56" fill="url(#o)"/><!-- streamlined raptor head -->
+<path d="M128 60 C86 60 62 96 62 136 C62 176 92 200 128 200 C164 200 194 176 194 136 C194 96 170 60 128 60 Z" fill="#fff"/>
+<!-- dark malar stripes = falcon recon mask -->
+<path d="M100 132 L112 190 L94 184 Z" fill="#7a2a06"/><path d="M156 132 L144 190 L162 184 Z" fill="#7a2a06"/>
+<!-- sharp recon eyes -->
+<circle cx="100" cy="122" r="12" fill="#7a2a06"/><circle cx="156" cy="122" r="12" fill="#7a2a06"/>
+<circle cx="104" cy="118" r="4" fill="#fff"/><circle cx="160" cy="118" r="4" fill="#fff"/>
+<!-- hooked beak -->
+<path d="M118 138 h20 l-2 20 C136 168 120 168 118 158 Z" fill="#fff"/>
+<path d="M126 150 l12 2 c2 10 -8 16 -12 8 Z" fill="#7a2a06"/>
+</svg>

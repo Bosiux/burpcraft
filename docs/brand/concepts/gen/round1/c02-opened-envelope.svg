@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"><title>Opened envelope with page peeking</title><defs><linearGradient id="o" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff8a3d"/><stop offset="1" stop-color="#d9480f"/></linearGradient></defs>
+<rect x="8" y="8" width="240" height="240" rx="56" fill="url(#o)"/>
+<rect x="80" y="52" width="96" height="92" rx="8" fill="#fff"/>
+<path d="M98 76 H158 M98 96 H158" fill="none" stroke="#7a2a06" stroke-width="9" stroke-linecap="round"/>
+<rect x="52" y="96" width="152" height="104" rx="16" fill="#fff"/>
+<path d="M52 104 L128 152 L204 104" fill="none" stroke="#7a2a06" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

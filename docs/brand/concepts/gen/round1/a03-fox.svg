@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"><title>Fox</title><defs><linearGradient id="o" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff8a3d"/><stop offset="1" stop-color="#d9480f"/></linearGradient></defs><rect x="8" y="8" width="240" height="240" rx="56" fill="url(#o)"/><!-- big sharp ears = cunning/intercept -->
+<path d="M70 58 L104 108 L58 118 Z" fill="#fff"/><path d="M186 58 L152 108 L198 118 Z" fill="#fff"/>
+<!-- inner ear knocked back to orange -->
+<path d="M78 76 L96 102 L72 106 Z" fill="url(#o)"/><path d="M178 76 L160 102 L184 106 Z" fill="url(#o)"/>
+<!-- diamond face down to pointed chin -->
+<path d="M72 102 C96 90 160 90 184 102 C176 150 152 176 128 208 C104 176 80 150 72 102 Z" fill="#fff"/>
+<!-- sly slanted eyes -->
+<path d="M96 130 l26 -2 -20 16 Z" fill="#7a2a06"/><path d="M160 130 l-26 -2 20 16 Z" fill="#7a2a06"/>
+<!-- muzzle + nose -->
+<path d="M112 164 h32 l-16 24 Z" fill="url(#o)"/><circle cx="128" cy="166" r="9" fill="#7a2a06"/>
+</svg>

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"><title>Magnifier over a request line</title><defs><linearGradient id="o" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff8a3d"/><stop offset="1" stop-color="#d9480f"/></linearGradient></defs>
+<rect x="8" y="8" width="240" height="240" rx="56" fill="url(#o)"/>
+<path d="M150 150 L204 204" fill="none" stroke="#fff" stroke-width="24" stroke-linecap="round"/>
+<circle cx="112" cy="112" r="58" fill="#fff"/>
+<g fill="#7a2a06">
+<rect x="80" y="92" width="48" height="13" rx="6"/>
+<rect x="80" y="112" width="64" height="13" rx="6"/>
+<rect x="80" y="132" width="36" height="13" rx="6"/>
+</g>
+</svg>

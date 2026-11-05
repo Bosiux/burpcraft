@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"><title>Raccoon</title><defs><linearGradient id="o" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff8a3d"/><stop offset="1" stop-color="#d9480f"/></linearGradient></defs><rect x="8" y="8" width="240" height="240" rx="56" fill="url(#o)"/><!-- ears: 2 confident facets each -->
+<path d="M62 92 L96 74 L92 112 Z" fill="#fff"/><path d="M194 92 L160 74 L164 112 Z" fill="#fff"/>
+<path d="M76 92 L92 82 L90 104 Z" fill="#7a2a06"/><path d="M180 92 L164 82 L166 104 Z" fill="#7a2a06"/>
+<!-- rounded head -->
+<path d="M128 72 C84 72 68 106 68 142 C68 184 96 206 128 206 C160 206 188 184 188 142 C188 106 172 72 128 72 Z" fill="#fff"/>
+<!-- bold bandit mask = unauthorized access (big + high contrast) -->
+<path d="M66 116 C70 98 106 96 128 114 C150 96 186 98 190 116 C192 148 176 164 154 160 C142 158 136 148 128 148 C120 148 114 158 102 160 C80 164 64 148 66 116 Z" fill="#7a2a06"/>
+<!-- eyes inside mask -->
+<circle cx="100" cy="128" r="8.5" fill="#fff"/><circle cx="156" cy="128" r="8.5" fill="#fff"/>
+<circle cx="100" cy="129" r="4" fill="#7a2a06"/><circle cx="156" cy="129" r="4" fill="#7a2a06"/>
+<!-- snout + nose -->
+<path d="M128 160 C117 160 112 184 128 196 C144 184 139 160 128 160 Z" fill="url(#o)"/>
+<ellipse cx="128" cy="172" rx="9" ry="7" fill="#7a2a06"/>
+</svg>

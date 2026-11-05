@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 320" width="1280" height="320">
+  <title>BurpCraft: web security testing toolkit in pure Rust</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#17171c"/>
+      <stop offset="1" stop-color="#2a1a10"/>
+    </linearGradient>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0 H0 V32" fill="none" stroke="#e8590c" stroke-opacity="0.16" stroke-width="1"/>
+    </pattern>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff8a3d"/>
+      <stop offset="1" stop-color="#d9480f"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="320" rx="24" fill="url(#bg)"/>
+  <rect width="1280" height="320" rx="24" fill="url(#grid)"/>
+  <!-- request stream flowing into the icon -->
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14" fill="#e8590c" fill-opacity="0.55">
+    <text x="900" y="70">GET /search?q=§payload§ HTTP/2</text>
+    <text x="940" y="100">Host: target.example</text>
+    <text x="880" y="250">HTTP/2 200 · 12.4 kB · 87 ms</text>
+    <text x="960" y="280">X-Issue: SQL injection (High)</text>
+  </g>
+  <g transform="translate(96 64) scale(0.75)">
+    <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#tile)"/>
+    <g fill="none" stroke="#ffffff" stroke-width="14" stroke-linecap="round">
+      <circle cx="140" cy="128" r="62"/>
+      <line x1="140" y1="52" x2="140" y2="80"/>
+      <line x1="140" y1="176" x2="140" y2="204"/>
+      <line x1="216" y1="128" x2="188" y2="128"/>
+    </g>
+    <path d="M40 128 H128" stroke="#ffffff" stroke-width="16" stroke-linecap="round"/>
+    <path d="M112 104 L144 128 L112 152 Z" fill="#ffffff" stroke="#ffffff" stroke-width="8" stroke-linejoin="round"/>
+    <circle cx="140" cy="128" r="9" fill="#7a2a06"/>
+  </g>
+  <g font-family="-apple-system, 'Segoe UI', Inter, Helvetica, Arial, sans-serif">
+    <text x="320" y="150" font-size="72" font-weight="800" fill="#ffffff" letter-spacing="-1.5">Burp<tspan fill="#e8590c">Craft</tspan></text>
+    <text x="324" y="196" font-size="26" font-weight="600" fill="#e6e6ea">Web security testing, built in pure Rust</text>
+    <text x="324" y="236" font-size="18" fill="#e6e6ea" fill-opacity="0.75">Proxy · Repeater · Intruder · Scanner · Collaborator · REST API</text>
+  </g>
+</svg>

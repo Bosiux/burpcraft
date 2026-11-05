@@ -1,0 +1,11 @@
+<!doctype html><meta charset=utf8><title>BurpCraft — emblemi incisi (nativo)</title>
+<style>body{margin:0;font-family:-apple-system,'Segoe UI',sans-serif;background:#f3f3f4}
+h1{font-size:20px;padding:20px 24px 4px}p{margin:0 24px 16px;color:#666}
+.g{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px;padding:8px 24px 32px}
+.c{background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 1px 4px #0001}
+.c img{width:100%;display:block}.c .n{font:600 12px ui-monospace,monospace;padding:8px 10px;color:#444}</style>
+<h1>BurpCraft — emblemi incisi, generati nativamente in Python</h1>
+<p>Soggetto bianco + linee incise a spessore variabile su tile arancione (Pillow/numpy/scipy + rsvg-convert). Zoom per vedere l'incisione.</p>
+<div class=g id=g></div>
+<script>const ids=["section-clean","e04t-section-tile","e07-B-intercept","e02-B-crosshair","e01-B-envelope","e06-B-bug","c03-magnifier-packet","d07-padlock-magnifier","a04-owl","b03-octopus","a08-raccoon","b05-cat-burglar","a03-fox"];
+for(const id of ids)g.insertAdjacentHTML("beforeend",`<div class=c><img src="engraved/${id}.png"><div class=n>${id}</div></div>`)</script>

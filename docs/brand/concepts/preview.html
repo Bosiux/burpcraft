@@ -1,0 +1,51 @@
+<!doctype html><html lang="it"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BurpCraft — concept logo</title>
+<style>
+ :root{--orange:#e8590c}
+ *{box-sizing:border-box}
+ body{margin:0;font-family:-apple-system,'Segoe UI',Inter,sans-serif;color:#1f1f24;background:#fafafa}
+ header{padding:28px 32px 8px}
+ h1{margin:0;font-size:22px}
+ header p{margin:6px 0 0;color:#666;font-size:14px;max-width:760px}
+ .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px;padding:24px 32px}
+ .card{border:1px solid #eadfd6;border-radius:16px;overflow:hidden;background:#fff}
+ .card h2{margin:0;padding:14px 18px;font-size:15px;border-bottom:1px solid #f0e7df}
+ .card h2 b{color:var(--orange)}
+ .themes{display:flex}
+ .pane{flex:1;padding:26px 0;text-align:center}
+ .light{background:#fffaf5}.dark{background:#17171c}
+ .big{width:132px;height:132px}
+ .sizes{display:flex;gap:18px;justify-content:center;align-items:flex-end;margin-top:16px}
+ .sizes figure{margin:0}.sizes figcaption{font-size:10px;opacity:.55;margin-top:5px}
+ .dark .sizes figcaption{color:#aaa}
+ .note{padding:4px 32px 36px;color:#777;font-size:13px}
+</style></head><body>
+<header>
+  <h1>BurpCraft — concept del marchio</h1>
+  <p>Quattro direzioni, ognuna su sfondo chiaro e scuro, con prova a 32px e 16px. Scegline una (o un incrocio) e la porto a definitivo: vettore ripulito, icona 16–1024 e banner del README.</p>
+</header>
+<div class="grid" id="grid"></div>
+<p class="note">File statico locale · <code>docs/brand/concepts/preview.html</code></p>
+<script>
+ const marks=[
+   ['A','monogram','Monogram B','spina + chevron “forward”'],
+   ['B','intercept','Intercept','la request devia nel proxy'],
+   ['C','section','§ — section sign','il marcatore di Intruder (consigliato)'],
+   ['D','reticle','Reticolo piatto','mirino + freccia scan/send'],
+ ];
+ const g=document.getElementById('grid');
+ for(const [id,file,name,desc] of marks){
+   const src=`${id}-${file}.svg`;
+   g.insertAdjacentHTML('beforeend',`<div class="card">
+     <h2><b>${id}</b> — ${name} · <span style="color:#888;font-weight:400">${desc}</span></h2>
+     <div class="themes">
+       ${['light','dark'].map(t=>`<div class="pane ${t}">
+         <img class="big" src="${src}" alt="${name}">
+         <div class="sizes">
+           <figure><img src="${src}" width="32" height="32"><figcaption>32px</figcaption></figure>
+           <figure><img src="${src}" width="16" height="16"><figcaption>16px</figcaption></figure>
+         </div></div>`).join('')}
+     </div></div>`);
+ }
+</script></body></html>

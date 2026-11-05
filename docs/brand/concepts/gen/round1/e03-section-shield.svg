@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"><title>Section shield</title><defs><linearGradient id="o" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff8a3d"/><stop offset="1" stop-color="#d9480f"/></linearGradient></defs>
+<g fill="none" stroke="url(#o)" stroke-linecap="round" stroke-linejoin="round">
+<path stroke-width="16" d="M128 32 L214 62 V128 C214 178 176 212 128 228 C80 212 42 178 42 128 V62 Z"/>
+<g stroke-width="20">
+<path d="M128 130 C102 130 94 110 104 96 C114 82 140 82 152 96"/>
+<path d="M128 130 C154 130 162 150 152 164 C142 178 116 178 104 164" transform="translate(0,-4)"/>
+</g>
+</g>
+</svg>

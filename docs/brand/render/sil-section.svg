@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+<g fill="none" stroke="#000" stroke-width="150" stroke-linecap="round">
+ <path id="h" d="M660 372 Q660 250 512 250 Q372 250 372 360 Q372 452 512 512"/>
+ <use href="#h" transform="rotate(180 512 512)"/>
+</g></svg>

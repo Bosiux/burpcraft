@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"><title>Fingerprint with a scan line across it</title><defs><linearGradient id="o" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff8a3d"/><stop offset="1" stop-color="#d9480f"/></linearGradient></defs>
+<rect x="8" y="8" width="240" height="240" rx="56" fill="url(#o)"/>
+<g fill="none" stroke="#fff" stroke-width="11" stroke-linecap="round">
+<path d="M80 110a48 48 0 0196 0v40"/>
+<path d="M104 106a24 24 0 0148 0v44"/>
+<path d="M128 104v50"/>
+<path d="M80 150v16"/>
+<path d="M176 150v18"/>
+</g>
+<path d="M60 128h136" stroke="#7a2a06" stroke-width="12" stroke-linecap="round"/>
+</svg>

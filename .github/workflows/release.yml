@@ -1,0 +1,178 @@
+name: Release
+
+# Stable: bump `version` in Cargo.toml, merge, then push a matching tag:
+#   git tag v0.2.0 && git push origin v0.2.0          -> release marked "latest"
+#   (a tag with a pre-release suffix, e.g. v0.2.0-rc.1, is published as pre-release)
+# Beta: Actions -> Release -> "Run workflow" on any branch.
+#   Publishes v<Cargo.toml version>-beta.<N> as a pre-release, never "latest".
+
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml
+
+  version:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      tag: ${{ steps.v.outputs.tag }}
+      prerelease: ${{ steps.v.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          base=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name=="burpcraft") | .version')
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            version=${GITHUB_REF_NAME#v}
+            # the tag must match the crate version (pre-release suffix allowed: 0.2.0-rc.1 on 0.2.0)
+            [ "${version%%-*}" = "${base%%-*}" ] || { echo "::error::tag $GITHUB_REF_NAME does not match Cargo.toml version $base"; exit 1; }
+          else
+            if git ls-remote --exit-code --tags origin "refs/tags/v$base" >/dev/null; then
+              echo "::error::v$base is already released; bump the version in Cargo.toml before cutting a beta"; exit 1
+            fi
+            n=$(git ls-remote --tags origin "refs/tags/v$base-beta.*" | grep -oE -- '-beta\.[0-9]+$' | cut -d. -f2 | sort -n | tail -1 || true)
+            version="$base-beta.$(( ${n:-0} + 1 ))"
+          fi
+          case $version in *-*) pre=true ;; *) pre=false ;; esac
+          printf 'version=%s\ntag=v%s\nprerelease=%s\n' "$version" "$version" "$pre" >> "$GITHUB_OUTPUT"
+          echo "### $version (pre-release: $pre)" >> "$GITHUB_STEP_SUMMARY"
+
+  build:
+    name: Build (${{ matrix.name }})
+    needs: [checks, version]
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { name: linux-x86_64, os: ubuntu-22.04, target: x86_64-unknown-linux-gnu }
+          - { name: linux-aarch64, os: ubuntu-22.04-arm, target: aarch64-unknown-linux-gnu }
+          - { name: windows-x86_64, os: windows-latest, target: x86_64-pc-windows-msvc }
+          - { name: macos-universal, os: macos-latest, target: aarch64-apple-darwin x86_64-apple-darwin, rust: "aarch64-apple-darwin,x86_64-apple-darwin" }
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      PKG: burpcraft-${{ needs.version.outputs.version }}-${{ matrix.name }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust || matrix.target }}
+
+      # stamp the resolved version (e.g. 0.2.0-beta.3) into the binaries, then refresh Cargo.lock
+      - name: Set version
+        run: |
+          for f in Cargo.toml server/Cargo.toml; do
+            sed -i.bak '1,/^version = /s/^version = .*/version = "'"$VERSION"'"/' "$f" && rm "$f.bak"
+          done
+          cargo metadata --format-version 1 >/dev/null
+
+      - name: Build
+        run: for t in ${{ matrix.target }}; do cargo build --release --workspace --target "$t"; done
+
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p "dist/$PKG"
+          cp target/${{ matrix.target }}/release/{burpcraft,burpcraft-server} README.md "dist/$PKG/"
+          tar -C dist -czf "dist/$PKG.tar.gz" "$PKG"
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          mkdir -p "dist/$PKG"
+          cp target/${{ matrix.target }}/release/{burpcraft,burpcraft-server}.exe README.md "dist/$PKG/"
+          cd dist && 7z a -tzip "$PKG.zip" "$PKG"
+
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          app="dist/$PKG/BurpCraft.app"
+          mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
+          for b in burpcraft burpcraft-server; do
+            lipo -create -output "dist/$b" target/{aarch64,x86_64}-apple-darwin/release/$b
+          done
+          mv dist/burpcraft "$app/Contents/MacOS/"
+          mv dist/burpcraft-server "dist/$PKG/"
+          cp assets/app-icon/BurpCraft.icns "$app/Contents/Resources/"
+          cat > "$app/Contents/Info.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>CFBundleName</key><string>BurpCraft</string>
+            <key>CFBundleDisplayName</key><string>BurpCraft</string>
+            <key>CFBundleIdentifier</key><string>io.github.bosiux.burpcraft</string>
+            <key>CFBundleExecutable</key><string>burpcraft</string>
+            <key>CFBundleIconFile</key><string>BurpCraft</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleShortVersionString</key><string>${VERSION%%-*}</string>
+            <key>CFBundleVersion</key><string>$VERSION</string>
+            <key>LSMinimumSystemVersion</key><string>11.0</string>
+            <key>NSHighResolutionCapable</key><true/>
+          </dict></plist>
+          EOF
+          # ponytail: ad-hoc signature only; Developer ID signing + notarization need an Apple account secret
+          codesign --force --deep --sign - "$app"
+          cp README.md "dist/$PKG/"
+          ln -s /Applications "dist/$PKG/Applications"
+          hdiutil create -volname "BurpCraft $VERSION" -srcfolder "dist/$PKG" -ov -format UDZO "dist/$PKG.dmg"
+
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/${{ env.PKG }}.*
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: dist/${{ env.PKG }}.*
+          if-no-files-found: error
+
+  publish:
+    name: Publish ${{ needs.version.outputs.tag }}
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ needs.version.outputs.tag }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - run: cd dist && sha256sum -- * > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - name: Create release
+        run: |
+          if [ "${{ needs.version.outputs.prerelease }}" = true ]; then
+            flags="--prerelease --latest=false"
+          else
+            flags="--latest"
+          fi
+          # shellcheck disable=SC2086 # $flags is intentionally split
+          # beta: the tag does not exist yet and is created on the dispatched commit
+          gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "BurpCraft ${TAG#v}" --generate-notes $flags

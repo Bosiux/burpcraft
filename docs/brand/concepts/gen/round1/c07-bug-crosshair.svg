@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"><title>Bug centered in a crosshair</title><defs><linearGradient id="o" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff8a3d"/><stop offset="1" stop-color="#d9480f"/></linearGradient></defs>
+<circle cx="128" cy="128" r="86" fill="none" stroke="url(#o)" stroke-width="12"/>
+<path d="M128 36 V62 M128 194 V220 M36 128 H62 M194 128 H220" fill="none" stroke="url(#o)" stroke-width="12" stroke-linecap="round"/>
+<g fill="none" stroke="url(#o)" stroke-width="7" stroke-linecap="round">
+<path d="M106 118 L82 108 M104 132 L78 132 M106 146 L82 158"/>
+<path d="M150 118 L174 108 M152 132 L178 132 M150 146 L174 158"/>
+<path d="M121 94 L111 80 M135 94 L145 80"/>
+</g>
+<circle cx="128" cy="104" r="12" fill="url(#o)"/>
+<ellipse cx="128" cy="134" rx="22" ry="30" fill="url(#o)"/>
+<path d="M128 114 V156" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+</svg>

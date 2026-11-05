@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"><title>B intercept</title><defs><linearGradient id="o" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff8a3d"/><stop offset="1" stop-color="#d9480f"/></linearGradient></defs>
+<rect x="8" y="8" width="240" height="240" rx="56" fill="url(#o)"/>
+<path fill="none" stroke="#fff" stroke-width="28" stroke-linecap="round" stroke-linejoin="round" d="M80 196 V60 H146 C178 60 178 128 146 128 H80 M80 128 H158 C194 128 194 196 158 196 H80"/>
+<rect x="118" y="46" width="20" height="164" fill="url(#o)"/>
+<circle cx="128" cy="128" r="12" fill="#fff"/>
+</svg>

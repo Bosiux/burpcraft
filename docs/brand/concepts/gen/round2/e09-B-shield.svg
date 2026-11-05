@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"><title>B shield</title><defs><linearGradient id="o" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff8a3d"/><stop offset="1" stop-color="#d9480f"/></linearGradient></defs>
+<g fill="none" stroke="url(#o)" stroke-linecap="round" stroke-linejoin="round">
+<path stroke-width="18" d="M128 28 C150 44 182 52 214 56 V128 C214 180 176 216 128 232 C80 216 42 180 42 128 V56 C74 52 106 44 128 28 Z"/>
+<path stroke-width="24" d="M98 180 V80 H140 C166 80 166 128 140 128 H98 M98 128 H150 C178 128 178 180 150 180 H98"/>
+</g>
+</svg>

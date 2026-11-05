@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"><title>Wolf</title><defs><linearGradient id="o" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff8a3d"/><stop offset="1" stop-color="#d9480f"/></linearGradient></defs><rect x="8" y="8" width="240" height="240" rx="56" fill="url(#o)"/><!-- upright pointed ears = pack hunter -->
+<path d="M72 54 L100 104 L62 110 Z" fill="#fff"/><path d="M184 54 L156 104 L194 110 Z" fill="#fff"/>
+<!-- broad angular head -->
+<path d="M68 100 C96 86 160 86 188 100 C186 140 172 160 148 172 L128 210 L108 172 C84 160 70 140 68 100 Z" fill="#fff"/>
+<!-- fur peak -->
+<path d="M128 84 l-14 22 h28 Z" fill="url(#o)"/>
+<!-- fierce angled eyes -->
+<path d="M94 128 l26 6 -24 10 Z" fill="#7a2a06"/><path d="M162 128 l-26 6 24 10 Z" fill="#7a2a06"/>
+<!-- muzzle + nose -->
+<path d="M112 160 h32 l-16 20 Z" fill="url(#o)"/><path d="M128 158 l-12 10 h24 Z" fill="#7a2a06"/>
+</svg>

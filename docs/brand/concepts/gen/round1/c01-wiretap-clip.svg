@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"><title>Wiretap alligator clip on a cable</title><defs><linearGradient id="o" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff8a3d"/><stop offset="1" stop-color="#d9480f"/></linearGradient></defs>
+<path d="M24 160H232" fill="none" stroke="url(#o)" stroke-width="18" stroke-linecap="round"/>
+<path d="M100 134 L60 112 M100 186 L60 208" fill="none" stroke="url(#o)" stroke-width="16" stroke-linecap="round"/>
+<circle cx="98" cy="160" r="12" fill="url(#o)"/>
+<path d="M92 118 L168 118 L168 150 L156 158 L144 150 L132 158 L120 150 L108 158 L96 150 Z" fill="url(#o)"/>
+<path d="M92 202 L168 202 L168 170 L156 162 L144 170 L132 162 L120 170 L108 162 L96 170 Z" fill="url(#o)"/>
+</svg>

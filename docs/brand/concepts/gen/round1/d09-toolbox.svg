@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"><title>Toolbox emblem with section-sign on the lid</title><defs><linearGradient id="o" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff8a3d"/><stop offset="1" stop-color="#d9480f"/></linearGradient></defs>
+<rect x="8" y="8" width="240" height="240" rx="56" fill="url(#o)"/>
+<g fill="none" stroke="#fff" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
+<rect x="56" y="104" width="144" height="92" rx="12"/>
+<path d="M98 104V84a12 12 0 0112-12h36a12 12 0 0112 12v20"/>
+<path d="M56 140h144"/>
+</g>
+<path d="M140 116a14 14 0 00-24 7c0 14 26 9 26 24a14 14 0 01-25 8" fill="none" stroke="#7a2a06" stroke-width="10" stroke-linecap="round"/>
+</svg>

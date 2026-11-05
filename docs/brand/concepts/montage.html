@@ -1,0 +1,27 @@
+<!doctype html><html><head><meta charset=utf8><style>
+ body{margin:0;font-family:-apple-system,'Segoe UI',sans-serif}
+ .row{display:flex}
+ .cell{width:320px;padding:22px 0;text-align:center}
+ .light{background:#fffaf5} .dark{background:#17171c;color:#ddd}
+ .light .lab{color:#666} .dark .lab{color:#999}
+ .lab{font-size:13px;margin-top:10px;letter-spacing:.3px}
+ .small{margin-top:14px;display:flex;gap:16px;justify-content:center;align-items:flex-end}
+ .small span{font-size:10px;opacity:.6;display:block;margin-top:4px}
+ h2{font:600 14px -apple-system;margin:0;padding:10px 0 0;text-align:center}
+ .light h2{color:#333}.dark h2{color:#bbb}
+</style></head><body>
+<script>
+ const marks=[['A','Monogram B · forward'],['B','Intercept · request detour'],['C','§ · Intruder marker'],['D','Reticle · flat scan']];
+ for(const theme of ['light','dark']){
+   document.write(`<div class="row ${theme}">`);
+   for(const [id,name] of marks){
+     document.write(`<div class="cell"><h2>${id} — ${name}</h2>
+       <img src="${id}-${{A:'monogram',B:'intercept',C:'section',D:'reticle'}[id]}.svg" width="120" height="120">
+       <div class="small">
+         <span style="text-align:center"><img src="${id}-${{A:'monogram',B:'intercept',C:'section',D:'reticle'}[id]}.svg" width="32" height="32"><span>32px</span></span>
+         <span style="text-align:center"><img src="${id}-${{A:'monogram',B:'intercept',C:'section',D:'reticle'}[id]}.svg" width="16" height="16"><span>16px</span></span>
+       </div></div>`);
+   }
+   document.write('</div>');
+ }
+</script></body></html>

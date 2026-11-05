@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"><title>Shield with keyhole</title><defs><linearGradient id="o" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff8a3d"/><stop offset="1" stop-color="#d9480f"/></linearGradient></defs>
+<path d="M128 28 L212 60 V120 C212 170 174 210 128 230 C82 210 44 170 44 120 V60 Z" fill="url(#o)"/>
+<circle cx="128" cy="112" r="20" fill="#fff"/>
+<path d="M118 126 H138 L147 164 H109 Z" fill="#fff"/>
+</svg>

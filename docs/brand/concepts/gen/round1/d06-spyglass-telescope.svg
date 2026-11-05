@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"><title>Brass spyglass telescope for recon</title><defs><linearGradient id="o" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff8a3d"/><stop offset="1" stop-color="#d9480f"/></linearGradient></defs>
+<g fill="none" stroke="url(#o)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round">
+<path d="M58 170l44-18"/>
+<path d="M92 158l52-56"/>
+<path d="M136 146l56-62"/>
+</g>
+<path d="M40 182l36-14-22-22z" fill="url(#o)"/>
+<circle cx="192" cy="84" r="24" fill="#fff" stroke="url(#o)" stroke-width="16"/>
+</svg>

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"><title>Owl</title><defs><linearGradient id="o" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff8a3d"/><stop offset="1" stop-color="#d9480f"/></linearGradient></defs><rect x="8" y="8" width="240" height="240" rx="56" fill="url(#o)"/><!-- attached ear tufts -->
+<path d="M72 92 L92 56 L112 90 Z" fill="#fff"/><path d="M184 92 L164 56 L144 90 Z" fill="#fff"/>
+<!-- rounded head -->
+<path d="M128 68 C76 68 58 106 58 146 C58 188 92 210 128 210 C164 210 198 188 198 146 C198 106 180 68 128 68 Z" fill="#fff"/>
+<!-- huge front-facing eyes = the asset -->
+<circle cx="98" cy="138" r="28" fill="url(#o)"/><circle cx="158" cy="138" r="28" fill="url(#o)"/>
+<circle cx="98" cy="138" r="16" fill="#7a2a06"/><circle cx="158" cy="138" r="16" fill="#7a2a06"/>
+<circle cx="104" cy="132" r="5.5" fill="#fff"/><circle cx="164" cy="132" r="5.5" fill="#fff"/>
+<!-- beak -->
+<path d="M128 156 l-11 15 h22 Z" fill="#7a2a06"/>
+</svg>

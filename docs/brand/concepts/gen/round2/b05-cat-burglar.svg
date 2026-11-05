@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"><title>BurpCraft cat burglar</title><defs><linearGradient id="o" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff8a3d"/><stop offset="1" stop-color="#d9480f"/></linearGradient></defs><rect x="8" y="8" width="240" height="240" rx="56" fill="url(#o)"/><!-- confident ears + rounded head -->
+<path d="M72 74 L102 116 L154 116 L184 74 L172 126 C198 150 196 198 128 198 C60 198 58 150 84 126 Z" fill="#fff"/>
+<!-- clear domino mask -->
+<path d="M74 100 C74 92 182 92 182 100 C184 118 179 130 166 134 L90 134 C77 130 72 118 74 100 Z" fill="#7a2a06"/>
+<!-- charming eyes -->
+<circle cx="104" cy="114" r="9" fill="#fff"/><circle cx="152" cy="114" r="9" fill="#fff"/>
+<circle cx="106" cy="115" r="4.5" fill="#7a2a06"/><circle cx="154" cy="115" r="4.5" fill="#7a2a06"/>
+<!-- nose + whiskers -->
+<path d="M120 152 h16 l-8 9 Z" fill="#7a2a06"/>
+<g stroke="#7a2a06" stroke-width="5" stroke-linecap="round"><path d="M118 160 L82 154M118 168 L82 174M138 160 L174 154M138 168 L174 174"/></g>
+</svg>

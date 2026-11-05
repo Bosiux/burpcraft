@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"><title>Praying Mantis</title><defs><linearGradient id="o" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff8a3d"/><stop offset="1" stop-color="#d9480f"/></linearGradient></defs><rect x="8" y="8" width="240" height="240" rx="56" fill="url(#o)"/><!-- triangular head = intercept & strike -->
+<path d="M72 92 C72 80 184 80 184 92 C176 150 148 180 128 196 C108 180 80 150 72 92 Z" fill="#fff"/>
+<!-- antennae -->
+<path d="M104 84 C92 58 80 52 68 46" stroke="#fff" stroke-width="7" fill="none" stroke-linecap="round"/>
+<path d="M152 84 C164 58 176 52 188 46" stroke="#fff" stroke-width="7" fill="none" stroke-linecap="round"/>
+<!-- big compound eyes at corners -->
+<circle cx="94" cy="110" r="20" fill="#7a2a06"/><circle cx="162" cy="110" r="20" fill="#7a2a06"/>
+<circle cx="100" cy="104" r="6" fill="#fff"/><circle cx="168" cy="104" r="6" fill="#fff"/>
+<!-- raised strike arms framing the face -->
+<path d="M92 150 C68 152 60 174 78 190 L86 182 C76 172 80 162 94 162 Z" fill="#fff"/>
+<path d="M164 150 C188 152 196 174 178 190 L170 182 C180 172 176 162 162 162 Z" fill="#fff"/>
+</svg>

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"><title>Submarine periscope</title><defs><linearGradient id="o" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff8a3d"/><stop offset="1" stop-color="#d9480f"/></linearGradient></defs>
+<path d="M124 214 V88 H182" fill="none" stroke="url(#o)" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M190 72 V104" fill="none" stroke="url(#o)" stroke-width="18" stroke-linecap="round"/>
+<path d="M102 214 H146" fill="none" stroke="url(#o)" stroke-width="18" stroke-linecap="round"/>
+<path d="M190 82 V96" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"/>
+</svg>

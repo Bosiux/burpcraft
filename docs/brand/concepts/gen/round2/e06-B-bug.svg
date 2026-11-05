@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"><title>B bug</title><defs><linearGradient id="o" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff8a3d"/><stop offset="1" stop-color="#d9480f"/></linearGradient></defs>
+<rect x="8" y="8" width="240" height="240" rx="56" fill="url(#o)"/>
+<g fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round">
+<path stroke-width="26" d="M92 196 V64 H150 C182 64 182 128 150 128 H92 M92 128 H162 C196 128 196 196 162 196 H92"/>
+<path stroke-width="18" d="M104 66 C100 46 86 40 74 38 M150 66 C154 46 168 42 180 38"/>
+<path stroke-width="18" d="M92 106 L60 94 M92 150 L58 160 M92 184 L62 196"/>
+</g>
+</svg>

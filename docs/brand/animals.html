@@ -1,0 +1,71 @@
+<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BurpCraft — mascotte candidate</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,'Segoe UI',Inter,sans-serif;color:#1d1d22;background:#f6f4f1}
+header{padding:26px 28px 6px}h1{margin:0;font-size:22px}
+header p{margin:6px 0 0;color:#666;font-size:14px;max-width:900px}
+.note{margin:12px 28px;padding:10px 14px;background:#eef7ee;border:1px solid #cfe6cf;border-radius:10px;font-size:13px;color:#2c6a2c}
+h2{font-size:14px;letter-spacing:.4px;text-transform:uppercase;color:#9a5a2a;margin:22px 28px 4px}
+.g{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;padding:4px 28px}
+.c{background:#fff;border:1px solid #ece3da;border-radius:16px;overflow:hidden;display:flex;flex-direction:column;transition:.12s}
+.c:hover{box-shadow:0 6px 18px #0002;transform:translateY(-3px)}
+.c img{width:100%;aspect-ratio:1;object-fit:cover;background:#eee}
+.b{padding:11px 13px;display:flex;flex-direction:column;gap:6px}
+.nm{font-weight:700;font-size:16px}.nm small{color:#999;font-weight:500;font-size:11px;margin-left:5px}
+.why{font-size:12.5px;color:#333;line-height:1.35}
+.feat{font-size:11px;color:#888}.feat b{color:#666}
+.sw{display:flex;gap:5px;margin-top:1px}.sw i{width:18px;height:18px;border-radius:5px;border:1px solid #0001}
+footer{padding:18px 28px 40px;color:#888;font-size:12px}
+</style></head><body>
+<header><h1>BurpCraft — scegli la mascotte 🐾</h1>
+<p>21 candidati generati (stile "squishy" carino, realistico). Metodo skill <b>ip-as-logo</b> + immagini via Pollinations (free, no key). Scegli l'animale: poi generiamo 6 varianti pulite e la rifiniamo come logo (tile + palette BurpCraft).</p></header>
+<div class="note">✅ Immagini reali generate gratuitamente. Watermark ritagliato. Prossimo passo: tu scegli 1 soggetto → 6 varianti controllate.</div>
+<h2>Intercettazione · MITM</h2><div class="g" id="g1"></div>
+<h2>Caccia · Scanner / discovery</h2><div class="g" id="g2"></div>
+<h2>Difesa · Robustezza</h2><div class="g" id="g3"></div>
+<h2>Sorveglianza · Monitoraggio</h2><div class="g" id="g4"></div>
+<h2>Jolly creativi</h2><div class="g" id="g5"></div>
+<footer>Sorgente immagini: image.pollinations.ai (Flux) · ritaglio watermark via Pillow. File in docs/brand/mascots/.</footer>
+<script>
+const A={
+ g1:[
+  ["fox","Volpe","Fox","Astuzia: intercetta e devia senza farsi notare.","muso triangolare, coda folta","#e8590c","#2b2b33","#f1e3d2"],
+  ["raccoon","Procione","Raccoon","Mascherina = accesso non autorizzato / hacker.","banda scura sugli occhi","#e8590c","#39404a","#ecdcc6"],
+  ["chameleon","Camaleonte","Chameleon","MITM: si traveste per stare 'nel mezzo'.","occhio rotante, coda a spirale","#e8590c","#2fa98c","#ece2cf"],
+  ["crab","Granchio","Crab","Chele = afferra i pacchetti; guscio = corazza.","due chele, guscio largo","#e8590c","#c0392b","#efe0cc"],
+ ],
+ g2:[
+  ["otter","Lontra","Otter","Curiosa: fruga e ispeziona ogni cosa.","corpo liscio, manine","#e8590c","#6b4a2b","#ece2ce"],
+  ["ferret","Furetto","Ferret","Si infila e scova = content discovery.","corpo lungo, musetto","#e8590c","#8a5a2b","#efe6d4"],
+  ["mongoose","Mangusta","Mongoose","Uccide i serpenti = neutralizza injection/attacchi.","corpo agile, occhi svegli","#e8590c","#7a5230","#ece2cf"],
+  ["bee","Ape","Bee","Instancabile: ispeziona cella per cella.","corpo a bande, aletta","#e8590c","#2b2b33","#f2e6c9"],
+ ],
+ g3:[
+  ["hedgehog","Riccio","Hedgehog","Spine difensive: si chiude a palla.","palla con punte smussate","#e8590c","#6b4a2b","#ece1ce"],
+  ["honeybadger","Tasso del miele","Honey badger","Il pentester impavido: non molla.","testa larga, striscia dorsale","#e8590c","#2b2b33","#ece2cf"],
+  ["pufferfish","Pesce palla","Pufferfish","Si gonfia sotto attacco = difesa reattiva.","sfera con spine tozze","#e8590c","#f2c14e","#e7d7be"],
+  ["pangolin","Pangolino","Pangolin","Corazza a scaglie = difesa a strati.","corpo arrotolato","#e8590c","#8a5a2b","#efe4d0"],
+ ],
+ g4:[
+  ["owl","Gufo","Owl","Vigile: monitora tutto il traffico.","due grandi occhi frontali","#e8590c","#5b4636","#ece2ce"],
+  ["cat","Gatto sentinella","Cat","Curioso e silenzioso: nota le anomalie.","orecchie a punta","#e8590c","#3a3a44","#eddfce"],
+  ["beaver","Castoro","Beaver","Costruisce la diga = il proxy tra due reti.","denti, coda piatta","#e8590c","#6b4a2b","#ece2ce"],
+  ["meerkat","Suricato","Meerkat","La sentinella eretta, sempre di guardia.","postura verticale","#e8590c","#c98a4b","#eae0cf"],
+ ],
+ g5:[
+  ["tardigrade","Tardigrado","Water bear","Indistruttibile: sopravvive a tutto.","corpo tozzo, 8 zampette","#e8590c","#7fb3a3","#eae0cf"],
+  ["axolotl","Axolotl","Axolotl","Si rigenera = resilienza; super carino.","ciuffi branchiali, sorriso","#e8590c","#e88aa5","#ede3d4"],
+  ["narwhal","Narvalo","Narwhal","'L'unicorno': il corno = sonda/probe.","corno frontale","#e8590c","#3c6e9a","#e9e0d2"],
+  ["platypus","Ornitorinco","Platypus","Elettrorecezione: 'sente' i segnali nascosti.","becco piatto","#e8590c","#5b7c99","#eae1d0"],
+  ["mantisshrimp","Canocchia","Mantis shrimp","Vista a 16 canali = deep inspection.","occhi su peduncoli","#e8590c","#2fa98c","#ece2cf"],
+ ],
+};
+for(const [gid,list] of Object.entries(A)){const g=document.getElementById(gid);
+ for(const [slug,it,en,why,feat,c1,c2,bg] of list){
+  g.insertAdjacentHTML("beforeend",`<div class="c"><img src="mascots/${slug}.png" alt="${it}" loading="lazy">
+   <div class="b"><div class="nm">${it}<small>${en}</small></div>
+   <div class="why">${why}</div><div class="feat"><b>Feature:</b> ${feat}</div>
+   <div class="sw"><i style="background:${c1}"></i><i style="background:${c2}"></i><i style="background:${bg}"></i></div></div></div>`);
+ }}
+</script></body></html>

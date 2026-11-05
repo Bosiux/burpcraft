@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"><title>Owl</title><defs><linearGradient id="o" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff8a3d"/><stop offset="1" stop-color="#d9480f"/></linearGradient></defs><rect x="8" y="8" width="240" height="240" rx="56" fill="url(#o)"/><!-- rounded head with ear tufts = watchfulness -->
+<path d="M66 92 L82 58 L104 86 Z" fill="#fff"/><path d="M190 92 L174 58 L152 86 Z" fill="#fff"/>
+<path d="M128 70 C78 70 60 108 60 142 C60 184 92 206 128 206 C164 206 196 184 196 142 C196 108 178 70 128 70 Z" fill="#fff"/>
+<!-- huge front-facing eyes (monitoring) -->
+<circle cx="100" cy="132" r="26" fill="url(#o)"/><circle cx="156" cy="132" r="26" fill="url(#o)"/>
+<circle cx="100" cy="132" r="15" fill="#7a2a06"/><circle cx="156" cy="132" r="15" fill="#7a2a06"/>
+<circle cx="105" cy="127" r="5" fill="#fff"/><circle cx="161" cy="127" r="5" fill="#fff"/>
+<!-- beak -->
+<path d="M128 150 l-11 16 h22 Z" fill="#7a2a06"/>
+</svg>

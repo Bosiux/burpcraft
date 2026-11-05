@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"><title>Honey Badger</title><defs><linearGradient id="o" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff8a3d"/><stop offset="1" stop-color="#d9480f"/></linearGradient></defs><rect x="8" y="8" width="240" height="240" rx="56" fill="url(#o)"/><!-- broad fearless head, flat crown stripe -->
+<path d="M128 56 C84 56 64 92 64 134 C64 182 94 206 128 206 C162 206 192 182 192 134 C192 92 172 56 128 56 Z" fill="#fff"/>
+<!-- dark lower face / jaw = low-slung tough look -->
+<path d="M84 150 C96 196 160 196 172 150 C160 178 96 178 84 150 Z" fill="#7a2a06"/>
+<!-- pale crown band knocked to orange sides via ears -->
+<path d="M70 108 L96 74 L108 104 Z" fill="#fff"/><path d="M186 108 L160 74 L148 104 Z" fill="#fff"/>
+<!-- narrow determined eyes -->
+<path d="M96 120 l24 4 -24 8 Z" fill="#7a2a06"/><path d="M160 120 l-24 4 24 8 Z" fill="#7a2a06"/>
+<!-- blunt snout -->
+<ellipse cx="128" cy="154" rx="16" ry="12" fill="#fff"/><ellipse cx="128" cy="150" rx="9" ry="6" fill="#7a2a06"/>
+</svg>

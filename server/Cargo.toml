@@ -1,0 +1,7 @@
+[package]
+name = "burpcraft-server"
+version = "0.1.0"
+edition = "2024"
+description = "Self-hosted BurpCraft Collaborator server: DNS, HTTP and SMTP interaction capture with a polling API"
+
+[dependencies]
