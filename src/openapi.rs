@@ -1,0 +1,482 @@
+//! API-definition scanning: turns an OpenAPI 3 / Swagger 2 JSON document into one ready request
+//! per operation (path, query, header and JSON/form body parameters filled from schema examples).
+// ponytail: JSON only (no YAML) and a minimal JSON parser; add a YAML reader if definitions arrive as .yaml
+use crate::scan::{Target, parse_url};
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum J {
+    Null,
+    Bool(bool),
+    Num(String),
+    Str(String),
+    Arr(Vec<J>),
+    Obj(Vec<(String, J)>),
+}
+
+impl J {
+    pub fn get(&self, k: &str) -> Option<&J> {
+        match self {
+            J::Obj(v) => v.iter().find(|(x, _)| x == k).map(|(_, v)| v),
+            _ => None,
+        }
+    }
+    fn str(&self) -> Option<&str> {
+        if let J::Str(s) = self { Some(s) } else { None }
+    }
+    fn entries(&self) -> &[(String, J)] {
+        if let J::Obj(v) = self { v } else { &[] }
+    }
+    fn items(&self) -> &[J] {
+        if let J::Arr(v) = self { v } else { &[] }
+    }
+    pub fn to_json(&self) -> String {
+        match self {
+            J::Null => "null".into(),
+            J::Bool(b) => b.to_string(),
+            J::Num(n) => n.clone(),
+            J::Str(s) => format!(
+                "\"{}\"",
+                s.replace('\\', "\\\\")
+                    .replace('"', "\\\"")
+                    .replace('\n', "\\n")
+            ),
+            J::Arr(v) => format!(
+                "[{}]",
+                v.iter().map(J::to_json).collect::<Vec<_>>().join(",")
+            ),
+            J::Obj(v) => format!(
+                "{{{}}}",
+                v.iter()
+                    .map(|(k, v)| format!("{}:{}", J::Str(k.clone()).to_json(), v.to_json()))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            ),
+        }
+    }
+}
+
+pub fn parse(s: &str) -> Result<J, String> {
+    let b = s.as_bytes();
+    let mut i = 0;
+    let v = value(b, &mut i, 0)?;
+    ws(b, &mut i);
+    if i != b.len() {
+        Err(format!("trailing data at byte {i}"))
+    } else {
+        Ok(v)
+    }
+}
+
+fn ws(b: &[u8], i: &mut usize) {
+    while *i < b.len() && b[*i].is_ascii_whitespace() {
+        *i += 1;
+    }
+}
+
+fn value(b: &[u8], i: &mut usize, depth: usize) -> Result<J, String> {
+    if depth > 200 {
+        return Err("nesting too deep".into());
+    }
+    ws(b, i);
+    let err = |i: usize| format!("unexpected input at byte {i}");
+    match b.get(*i) {
+        Some(b'{') => {
+            *i += 1;
+            let mut v = vec![];
+            loop {
+                ws(b, i);
+                if b.get(*i) == Some(&b'}') {
+                    *i += 1;
+                    return Ok(J::Obj(v));
+                }
+                let J::Str(k) = value(b, i, depth + 1)? else {
+                    return Err(err(*i));
+                };
+                ws(b, i);
+                if b.get(*i) != Some(&b':') {
+                    return Err(err(*i));
+                }
+                *i += 1;
+                v.push((k, value(b, i, depth + 1)?));
+                ws(b, i);
+                match b.get(*i) {
+                    Some(b',') => *i += 1,
+                    Some(b'}') => {}
+                    _ => return Err(err(*i)),
+                }
+            }
+        }
+        Some(b'[') => {
+            *i += 1;
+            let mut v = vec![];
+            loop {
+                ws(b, i);
+                if b.get(*i) == Some(&b']') {
+                    *i += 1;
+                    return Ok(J::Arr(v));
+                }
+                v.push(value(b, i, depth + 1)?);
+                ws(b, i);
+                match b.get(*i) {
+                    Some(b',') => *i += 1,
+                    Some(b']') => {}
+                    _ => return Err(err(*i)),
+                }
+            }
+        }
+        Some(b'"') => {
+            *i += 1;
+            let mut out = Vec::new();
+            while let Some(&c) = b.get(*i) {
+                *i += 1;
+                match c {
+                    b'"' => {
+                        return String::from_utf8(out)
+                            .map(J::Str)
+                            .map_err(|_| "invalid UTF-8".into());
+                    }
+                    b'\\' => {
+                        let e = *b.get(*i).ok_or_else(|| err(*i))?;
+                        *i += 1;
+                        match e {
+                            b'n' => out.push(b'\n'),
+                            b't' => out.push(b'\t'),
+                            b'r' => out.push(b'\r'),
+                            b'b' => out.push(8),
+                            b'f' => out.push(12),
+                            b'u' => {
+                                let hex =
+                                    std::str::from_utf8(b.get(*i..*i + 4).ok_or_else(|| err(*i))?)
+                                        .map_err(|_| err(*i))?;
+                                *i += 4;
+                                let ch = char::from_u32(
+                                    u32::from_str_radix(hex, 16).map_err(|_| err(*i))?,
+                                )
+                                .unwrap_or('\u{FFFD}');
+                                out.extend_from_slice(ch.to_string().as_bytes());
+                            }
+                            c => out.push(c),
+                        }
+                    }
+                    c => out.push(c),
+                }
+            }
+            Err("unterminated string".into())
+        }
+        Some(b't') if b[*i..].starts_with(b"true") => {
+            *i += 4;
+            Ok(J::Bool(true))
+        }
+        Some(b'f') if b[*i..].starts_with(b"false") => {
+            *i += 5;
+            Ok(J::Bool(false))
+        }
+        Some(b'n') if b[*i..].starts_with(b"null") => {
+            *i += 4;
+            Ok(J::Null)
+        }
+        Some(c) if c.is_ascii_digit() || *c == b'-' => {
+            let s = *i;
+            while *i < b.len() && (b[*i].is_ascii_digit() || b"+-.eE".contains(&b[*i])) {
+                *i += 1;
+            }
+            Ok(J::Num(String::from_utf8_lossy(&b[s..*i]).into_owned()))
+        }
+        _ => Err(err(*i)),
+    }
+}
+
+/// Follows a local `$ref` (`#/components/schemas/X`, `#/definitions/X`).
+fn resolve<'a>(doc: &'a J, mut s: &'a J) -> &'a J {
+    for _ in 0..20 {
+        let Some(r) = s
+            .get("$ref")
+            .and_then(J::str)
+            .and_then(|r| r.strip_prefix("#/"))
+        else {
+            break;
+        };
+        match r.split('/').try_fold(doc, |acc, k| acc.get(k)) {
+            Some(t) => s = t,
+            None => break,
+        }
+    }
+    s
+}
+
+/// Example value for a schema: example/default/enum, else a typical value of its type.
+pub fn example(doc: &J, schema: &J, depth: usize) -> J {
+    let s = resolve(doc, schema);
+    if let Some(v) = s
+        .get("example")
+        .or(s.get("default"))
+        .or_else(|| s.get("enum").and_then(|e| e.items().first()))
+    {
+        return v.clone();
+    }
+    if depth > 8 {
+        return J::Null;
+    }
+    match s
+        .get("type")
+        .and_then(J::str)
+        .unwrap_or(if s.get("properties").is_some() {
+            "object"
+        } else {
+            "string"
+        }) {
+        "integer" | "number" => J::Num("1".into()),
+        "boolean" => J::Bool(true),
+        "array" => J::Arr(vec![example(
+            doc,
+            s.get("items").unwrap_or(&J::Null),
+            depth + 1,
+        )]),
+        "object" => J::Obj(
+            s.get("properties")
+                .map(|p| {
+                    p.entries()
+                        .iter()
+                        .map(|(k, v)| (k.clone(), example(doc, v, depth + 1)))
+                        .collect()
+                })
+                .unwrap_or_default(),
+        ),
+        _ => J::Str("test".into()),
+    }
+}
+
+fn scalar(j: &J) -> String {
+    match j {
+        J::Str(s) => s.clone(),
+        J::Null => String::new(),
+        other => other.to_json(),
+    }
+}
+
+/// One raw request per operation. `base` (e.g. the scan URL) overrides the document's server.
+pub fn requests(doc: &J, base: Option<&str>) -> Result<Vec<(Target, String)>, String> {
+    let server = match base {
+        Some(b) => b.trim_end_matches('/').to_string(),
+        None => {
+            if let Some(u) = doc
+                .get("servers")
+                .and_then(|s| s.items().first())
+                .and_then(|s| s.get("url"))
+                .and_then(J::str)
+            {
+                u.trim_end_matches('/').to_string()
+            } else if let Some(h) = doc.get("host").and_then(J::str) {
+                let scheme = doc
+                    .get("schemes")
+                    .and_then(|s| s.items().first())
+                    .and_then(J::str)
+                    .unwrap_or("https");
+                format!(
+                    "{scheme}://{h}{}",
+                    doc.get("basePath")
+                        .and_then(J::str)
+                        .unwrap_or("")
+                        .trim_end_matches('/')
+                )
+            } else {
+                return Err(
+                    "the definition has no server; enter the API's base URL in the URLs box".into(),
+                );
+            }
+        }
+    };
+    let (target, prefix) =
+        parse_url(&server).ok_or_else(|| format!("not an absolute http(s) URL: {server}"))?;
+    let prefix = prefix.trim_end_matches('/').to_string();
+    let host = if (target.tls && target.port == 443) || (!target.tls && target.port == 80) {
+        target.host.clone()
+    } else {
+        format!("{}:{}", target.host, target.port)
+    };
+    let paths = doc.get("paths").ok_or("no \"paths\" in the definition")?;
+    let mut out = vec![];
+    for (path, item) in paths.entries() {
+        let shared: Vec<&J> = item
+            .get("parameters")
+            .map(|p| p.items().iter().collect())
+            .unwrap_or_default();
+        for (method, op) in item.entries().iter().filter(|(m, _)| {
+            ["get", "post", "put", "patch", "delete", "head", "options"].contains(&m.as_str())
+        }) {
+            let (mut p, mut query, mut headers, mut body, mut ctype) =
+                (path.clone(), vec![], String::new(), String::new(), "");
+            let params = shared.iter().copied().chain(
+                op.get("parameters")
+                    .map(|p| p.items().iter().collect::<Vec<_>>())
+                    .unwrap_or_default(),
+            );
+            for param in params {
+                let param = resolve(doc, param);
+                let name = param.get("name").and_then(J::str).unwrap_or("");
+                // Swagger 2 keeps the type on the parameter, OpenAPI 3 in `schema`
+                let v = param
+                    .get("example")
+                    .cloned()
+                    .unwrap_or_else(|| example(doc, param.get("schema").unwrap_or(param), 0));
+                match param.get("in").and_then(J::str).unwrap_or("") {
+                    "path" => {
+                        p = p.replace(
+                            &format!("{{{name}}}"),
+                            &crate::codec::url_encode(scalar(&v).as_bytes(), false),
+                        )
+                    }
+                    "query" => query.push(format!(
+                        "{name}={}",
+                        crate::codec::url_encode(scalar(&v).as_bytes(), false)
+                    )),
+                    "header" => headers += &format!("{name}: {}\r\n", scalar(&v)),
+                    "body" => (body, ctype) = (v.to_json(), "application/json"),
+                    "formData" => {
+                        body += &format!(
+                            "{}{name}={}",
+                            if body.is_empty() { "" } else { "&" },
+                            crate::codec::url_encode(scalar(&v).as_bytes(), false)
+                        );
+                        ctype = "application/x-www-form-urlencoded";
+                    }
+                    _ => {}
+                }
+            }
+            if let Some(content) = op
+                .get("requestBody")
+                .map(|b| resolve(doc, b))
+                .and_then(|b| b.get("content"))
+            {
+                if let Some(m) = content.get("application/json").or_else(|| {
+                    content
+                        .entries()
+                        .iter()
+                        .find(|(k, _)| k.contains("json"))
+                        .map(|(_, v)| v)
+                }) {
+                    let schema = m.get("schema").unwrap_or(&J::Null);
+                    (body, ctype) = (
+                        m.get("example")
+                            .cloned()
+                            .unwrap_or_else(|| example(doc, schema, 0))
+                            .to_json(),
+                        "application/json",
+                    );
+                } else if let Some(m) = content.get("application/x-www-form-urlencoded") {
+                    let ex = example(doc, m.get("schema").unwrap_or(&J::Null), 0);
+                    body = ex
+                        .entries()
+                        .iter()
+                        .map(|(k, v)| {
+                            format!(
+                                "{k}={}",
+                                crate::codec::url_encode(scalar(v).as_bytes(), false)
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                        .join("&");
+                    ctype = "application/x-www-form-urlencoded";
+                }
+            }
+            let q = if query.is_empty() {
+                String::new()
+            } else {
+                format!("?{}", query.join("&"))
+            };
+            let ct = if body.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    "Content-Type: {ctype}\r\nContent-Length: {}\r\n",
+                    body.len()
+                )
+            };
+            let req = format!(
+                "{} {prefix}{p}{q} HTTP/1.1\r\nHost: {host}\r\nUser-Agent: Mozilla/5.0 (BurpCraft Scanner)\r\nAccept: */*\r\n{headers}{ct}Connection: close\r\n\r\n{body}",
+                method.to_ascii_uppercase()
+            );
+            out.push((target.clone(), req));
+        }
+    }
+    Ok(out)
+}
+
+pub fn load(path: &str, base: Option<&str>) -> Result<Vec<(Target, String)>, String> {
+    let text = std::fs::read_to_string(path).map_err(|e| format!("{path}: {e}"))?;
+    requests(&parse(&text)?, base)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn json_parser() {
+        let j = parse(r#" {"a": [1, -2.5e3, true, null], "b\"": "xé\n", "c": {}} "#).unwrap();
+        assert_eq!(
+            j.get("a"),
+            Some(&J::Arr(vec![
+                J::Num("1".into()),
+                J::Num("-2.5e3".into()),
+                J::Bool(true),
+                J::Null
+            ]))
+        );
+        assert_eq!(j.get("b\"").and_then(J::str), Some("xé\n"));
+        assert_eq!(parse(&j.to_json()).unwrap(), j);
+        assert!(
+            parse("{\"a\":}").is_err()
+                && parse("[1,2").is_err()
+                && parse("1 2").is_err()
+                && parse(&"[".repeat(500)).is_err()
+        );
+    }
+
+    #[test]
+    fn openapi3_and_swagger2() {
+        let doc = parse(r##"{
+          "openapi": "3.0.0", "servers": [{"url": "http://api.test:8080/v1"}],
+          "components": {"schemas": {"User": {"type": "object", "properties": {"name": {"type": "string", "example": "bob"}, "age": {"type": "integer"}}}}},
+          "paths": {
+            "/users/{id}": {
+              "parameters": [{"name": "id", "in": "path", "schema": {"type": "integer"}}],
+              "get": {"parameters": [{"name": "fields", "in": "query", "schema": {"type": "string", "enum": ["all"]}}, {"name": "X-Key", "in": "header", "schema": {"type": "string"}}]},
+              "put": {"requestBody": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}}}}
+            }
+          }}"##).unwrap();
+        let r = requests(&doc, None).unwrap();
+        assert_eq!(r.len(), 2);
+        assert_eq!((r[0].0.host.as_str(), r[0].0.port), ("api.test", 8080));
+        assert!(
+            r[0].1
+                .starts_with("GET /v1/users/1?fields=all HTTP/1.1\r\nHost: api.test:8080\r\n")
+                && r[0].1.contains("X-Key: test\r\n")
+        );
+        assert!(
+            r[1].1.starts_with("PUT /v1/users/1 HTTP/1.1")
+                && r[1].1.ends_with("\r\n\r\n{\"name\":\"bob\",\"age\":1}")
+                && r[1].1.contains("Content-Length: 22")
+        );
+        assert_eq!(crate::scan::points(&r[1].1).len(), 3); // name, age, User-Agent
+
+        let sw = parse(r#"{"swagger": "2.0", "host": "old.test", "basePath": "/api", "schemes": ["https"],
+          "paths": {"/login": {"post": {"parameters": [{"name": "user", "in": "formData", "type": "string"}, {"name": "pin", "in": "formData", "type": "integer"}]}}}}"#).unwrap();
+        let r = requests(&sw, None).unwrap();
+        assert!(
+            r[0].0.tls
+                && r[0]
+                    .1
+                    .starts_with("POST /api/login HTTP/1.1\r\nHost: old.test\r\n")
+                && r[0].1.ends_with("user=test&pin=1")
+        );
+        // the scan URL overrides the document's server
+        assert_eq!(
+            requests(&sw, Some("http://127.0.0.1:9000")).unwrap()[0]
+                .0
+                .port,
+            9000
+        );
+        assert!(requests(&parse(r#"{"paths": {}}"#).unwrap(), None).is_err());
+    }
+}

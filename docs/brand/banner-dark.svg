@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 320" width="1280" height="320">
+  <title>BurpCraft: web security testing toolkit in pure Rust</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#17171c"/>
+      <stop offset="1" stop-color="#2a1a10"/>
+    </linearGradient>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0 H0 V32" fill="none" stroke="#e8590c" stroke-opacity="0.14" stroke-width="1"/>
+    </pattern>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff8a3d"/>
+      <stop offset="1" stop-color="#d9480f"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ff8a3d" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#ff8a3d" stop-opacity="0"/>
+    </radialGradient>
+    <!-- traffic dissolves before it reaches the title -->
+    <linearGradient id="fadeg" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0.52" stop-color="#fff" stop-opacity="0"/>
+      <stop offset="0.70" stop-color="#fff" stop-opacity="1"/>
+    </linearGradient>
+    <mask id="fade" maskUnits="userSpaceOnUse" x="0" y="0" width="1280" height="320">
+      <rect width="1280" height="320" fill="url(#fadeg)"/>
+    </mask>
+    <filter id="far" x="-10%" y="-50%" width="120%" height="200%"><feGaussianBlur stdDeviation="2.4"/></filter>
+    <filter id="mid" x="-10%" y="-50%" width="120%" height="200%"><feGaussianBlur stdDeviation="0.9"/></filter>
+    <clipPath id="card"><rect width="1280" height="320" rx="24"/></clipPath>
+  </defs>
+  <g clip-path="url(#card)">
+  <rect width="1280" height="320" fill="url(#bg)"/>
+  <rect width="1280" height="320" fill="url(#grid)"/>
+  <circle cx="186" cy="160" r="190" fill="url(#glow)"/>
+  <g filter="url(#far)" mask="url(#fade)" fill="#e8590c" fill-opacity="0.55"
+     font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
+    <text x="700" y="50" font-size="13">POST /api/v2/login HTTP/1.1</text>
+    <text x="1010" y="46" font-size="12">Cookie: session=7f3a9c2e; csrf=b81d</text>
+    <text x="740" y="142" font-size="12">{"user":"admin","pass":"§x§"}</text>
+    <text x="1080" y="144" font-size="13">' OR 1=1--</text>
+    <text x="690" y="202" font-size="12">Set-Cookie: JSESSIONID=a91f; HttpOnly</text>
+    <text x="1100" y="200" font-size="12">../../../../etc/passwd</text>
+    <text x="760" y="274" font-size="13">Upgrade: websocket</text>
+    <text x="1040" y="274" font-size="12">nslookup q8x.oast.example</text>
+  </g>
+  <g filter="url(#mid)" mask="url(#fade)" fill="#e8590c" fill-opacity="0.6"
+     font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
+    <text x="880" y="26" font-size="13">HTTP/1.1 302 Found</text>
+    <text x="1070" y="26" font-size="13">Location: /admin</text>
+    <text x="900" y="174" font-size="13">&lt;script&gt;alert(1)&lt;/script&gt;</text>
+    <text x="1150" y="174" font-size="13">{{7*7}}</text>
+    <text x="880" y="302" font-size="12">X-Forwarded-For: 127.0.0.1</text>
+    <text x="1130" y="302" font-size="12">Accept: */*</text>
+  </g>
+  <g xml:space="preserve" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15">
+    <text x="900" y="76"><tspan fill="#ff8a3d" font-weight="700">GET</tspan><tspan fill="#d8d8de"> /search?q=</tspan></text>
+    <rect x="1031" y="61" width="90" height="21" rx="5" fill="#ff8a3d"/>
+    <text x="1036" y="76" fill="#1a0f08" font-weight="700">§payload§</text>
+    <text x="1130" y="76" fill="#8d8d99">HTTP/2</text>
+    <text x="900" y="102"><tspan fill="#8d8d99">Host: </tspan><tspan fill="#d8d8de">target.example</tspan></text>
+    <text x="900" y="126"><tspan fill="#8d8d99">Cookie: </tspan><tspan fill="#d8d8de">session=§a1b2§</tspan></text>
+    <text x="900" y="228"><tspan fill="#8d8d99">HTTP/2 </tspan><tspan fill="#7ee2a8" font-weight="700">200</tspan><tspan fill="#8d8d99"> · 12.4 kB · 87 ms</tspan></text>
+    <circle cx="906" cy="249" r="5" fill="#ff8a3d"/>
+    <text x="918" y="254"><tspan fill="#d8d8de" font-weight="700">SQL injection</tspan><tspan fill="#8d8d99">  High · Certain</tspan></text>
+  </g>
+  </g>
+  <g transform="translate(96 64) scale(0.75)">
+    <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#tile)"/>
+    <g fill="#fff">
+    <!-- eye stalks -->
+    <rect x="100" y="94" width="12" height="40" rx="6"/>
+    <rect x="144" y="94" width="12" height="40" rx="6"/>
+    <circle cx="106" cy="92" r="17"/>
+    <circle cx="150" cy="92" r="17"/>
+    <!-- legs: 3 per side -->
+    <g stroke="#fff" stroke-width="13" stroke-linecap="round" fill="none">
+    <path d="M86 150 C64 158 52 168 44 184"/>
+    <path d="M84 166 C62 176 52 188 46 204"/>
+    <path d="M90 182 C72 194 64 206 62 220"/>
+    <path d="M170 150 C192 158 204 168 212 184"/>
+    <path d="M172 166 C194 176 204 188 210 204"/>
+    <path d="M166 182 C184 194 192 206 194 220"/>
+    </g>
+    <!-- claws -->
+    <path d="M78 128 C54 112 36 116 30 134 C26 148 36 160 52 160 C44 150 48 140 60 140 C50 150 58 162 72 158 C84 154 86 140 78 128 Z"/>
+    <path d="M178 128 C202 112 220 116 226 134 C230 148 220 160 204 160 C212 150 208 140 196 140 C206 150 198 162 184 158 C172 154 170 140 178 128 Z"/>
+    <!-- body / shell -->
+    <path d="M128 112 C168 112 196 134 196 164 C196 192 166 210 128 210 C90 210 60 192 60 164 C60 134 88 112 128 112 Z"/>
+    </g>
+    <!-- pupils -->
+    <circle cx="106" cy="92" r="7.5" fill="#7a2a06"/>
+    <circle cx="150" cy="92" r="7.5" fill="#7a2a06"/>
+    <!-- little smile -->
+    <path d="M114 176 q14 12 28 0" stroke="#7a2a06" stroke-width="6" fill="none" stroke-linecap="round"/>
+  </g>
+  <g font-family="-apple-system, 'Segoe UI', Inter, Helvetica, Arial, sans-serif">
+    <text x="320" y="150" font-size="72" font-weight="800" fill="#ffffff" letter-spacing="-1.5">Burp<tspan fill="#e8590c">Craft</tspan></text>
+    <text x="324" y="196" font-size="26" font-weight="600" fill="#e6e6ea">Web security testing, built in pure Rust</text>
+    <text x="324" y="236" font-size="18" fill="#e6e6ea" fill-opacity="0.75">Proxy · Repeater · Intruder · Scanner · Collaborator · REST API</text>
+  </g>
+</svg>
