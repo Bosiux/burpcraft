@@ -9,10 +9,12 @@ use crate::theme;
 #[derive(Default)]
 struct Node(BTreeMap<String, Node>);
 
+/// Scope rules (enabled, include, url prefix), shared with the MCP server.
+pub type Scope = std::sync::Arc<std::sync::Mutex<Vec<(bool, bool, String)>>>;
+
 pub struct Target {
     pub tab: &'static str,
-    /// (enabled, include, url prefix)
-    pub scope: Vec<(bool, bool, String)>,
+    pub scope: Scope,
     selected: Vec<String>, // origin followed by path segments
     selected_item: Option<usize>,
     only_in_scope: bool,
@@ -23,7 +25,7 @@ impl Default for Target {
     fn default() -> Self {
         Self {
             tab: "Site map",
-            scope: vec![],
+            scope: Default::default(),
             selected: vec![],
             selected_item: None,
             only_in_scope: false,
@@ -37,6 +39,8 @@ impl Target {
         let url = format!("{}{}", e.origin(), e.url);
         let m = |inc: bool| {
             self.scope
+                .lock()
+                .unwrap()
                 .iter()
                 .any(|(on, i, p)| *on && *i == inc && url.starts_with(p.as_str()))
         };
@@ -45,8 +49,9 @@ impl Target {
 
     pub fn add_to_scope(&mut self, e: &Entry) {
         let p = format!("{}/", e.origin());
-        if !self.scope.iter().any(|(_, i, x)| *i && *x == p) {
-            self.scope.push((true, true, p));
+        let mut scope = self.scope.lock().unwrap();
+        if !scope.iter().any(|(_, i, x)| *i && *x == p) {
+            scope.push((true, true, p));
         }
     }
 
@@ -119,10 +124,10 @@ impl Target {
                     .show(ui, |ui| {
                         for (origin, node) in &root.0 {
                             let path = vec![origin.clone()];
-                            let in_scope = self
-                                .scope
-                                .iter()
-                                .any(|(on, inc, p)| *on && *inc && p.starts_with(origin.as_str()));
+                            let in_scope =
+                                self.scope.lock().unwrap().iter().any(|(on, inc, p)| {
+                                    *on && *inc && p.starts_with(origin.as_str())
+                                });
                             self.tree(ui, origin, node, path, in_scope, &mut action, &entries);
                         }
                     });
@@ -180,7 +185,7 @@ impl Target {
         entries: &[Entry],
     ) {
         let selected = self.selected == path;
-        let color = if in_scope || self.scope.is_empty() {
+        let color = if in_scope || self.scope.lock().unwrap().is_empty() {
             theme::text()
         } else {
             theme::muted()
@@ -223,6 +228,8 @@ impl Target {
                 }
                 if ui.button("Remove from scope").clicked() {
                     self.scope
+                        .lock()
+                        .unwrap()
                         .retain(|(_, _, p)| !p.starts_with(path[0].as_str()));
                     ui.close();
                 }
@@ -256,11 +263,11 @@ impl Target {
                     ui.vertical(|ui| {
                         ui.set_width(90.0);
                         if ui.add_sized([85.0, 24.0], egui::Button::new("Add")).clicked() && !self.new_rule.trim().is_empty() {
-                            self.scope.push((true, include, self.new_rule.trim().to_string()));
+                            self.scope.lock().unwrap().push((true, include, self.new_rule.trim().to_string()));
                             self.new_rule.clear();
                         }
                         if ui.add_sized([85.0, 24.0], egui::Button::new("Clear")).clicked() {
-                            self.scope.retain(|(_, i, _)| *i != include);
+                            self.scope.lock().unwrap().retain(|(_, i, _)| *i != include);
                         }
                     });
                     egui::Frame::new().stroke(egui::Stroke::new(1.0, theme::border())).inner_margin(4).show(ui, |ui| {
@@ -271,7 +278,8 @@ impl Target {
                             ui.label("");
                             ui.end_row();
                             let mut remove = None;
-                            for (i, (on, inc, p)) in self.scope.iter_mut().enumerate().filter(|(_, r)| r.1 == include) {
+                            let mut scope = self.scope.lock().unwrap();
+                            for (i, (on, inc, p)) in scope.iter_mut().enumerate().filter(|(_, r)| r.1 == include) {
                                 let _ = inc;
                                 ui.checkbox(on, "");
                                 ui.monospace(p.as_str());
@@ -281,7 +289,7 @@ impl Target {
                                 ui.end_row();
                             }
                             if let Some(i) = remove {
-                                self.scope.remove(i);
+                                scope.remove(i);
                             }
                         });
                     });
@@ -324,7 +332,10 @@ mod tests {
         assert!(!t.in_scope(&e));
         t.add_to_scope(&e);
         assert!(t.in_scope(&e));
-        t.scope.push((true, false, "https://a.com/admin".into()));
+        t.scope
+            .lock()
+            .unwrap()
+            .push((true, false, "https://a.com/admin".into()));
         assert!(!t.in_scope(&e));
         t.selected = vec!["https://a.com".into(), "admin".into()];
         assert!(t.matches(&e));

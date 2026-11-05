@@ -10,6 +10,7 @@ mod engage;
 mod ext;
 mod h2up;
 mod intruder;
+mod mcp;
 mod misc;
 mod net;
 mod openapi;
@@ -91,6 +92,8 @@ struct App {
     scans: rest::Tasks,
     /// REST API port while it runs.
     rest_port: Option<u16>,
+    /// MCP server port while it runs.
+    mcp_port: Option<u16>,
     /// New scan dialog: (URLs, config, API definition path, schedule "HH:MM" or empty, repeat hours).
     scan_dlg: Option<(String, scan::Config, String, String, u32)>,
     /// Scheduled scans: (next run, repeat hours (0 = once), URLs, config).
@@ -144,6 +147,11 @@ impl App {
             let (port, key) = v.split_once(':').unwrap_or((&v, ""));
             app.start_rest(port.parse().unwrap_or(1337), key.to_string());
         }
+        // BURPCRAFT_MCP=port[:token] starts the MCP server for AI agents
+        if let Ok(v) = std::env::var("BURPCRAFT_MCP") {
+            let (port, key) = v.split_once(':').unwrap_or((&v, ""));
+            app.start_mcp(port.parse().unwrap_or(1338), key.to_string());
+        }
         // `burpcraft <file.burpcraft>` opens a project
         if let Some(path) = std::env::args_os().nth(1).map(std::path::PathBuf::from) {
             match project::open(&mut app, &path) {
@@ -194,6 +202,7 @@ impl App {
             collab: Default::default(),
             scans: Default::default(),
             rest_port: None,
+            mcp_port: None,
             scan_dlg: None,
             schedules: vec![],
             live_active: false,
@@ -210,6 +219,22 @@ impl App {
             Err(e) => format!("Failed to start REST API on port {port}: {e}"),
         };
         self.state.lock().unwrap().event("REST API", msg);
+    }
+
+    fn start_mcp(&mut self, port: u16, key: String) {
+        let ctx = mcp::Ctx {
+            state: self.state.clone(),
+            tasks: self.scans.clone(),
+            scope: self.target.scope.clone(),
+        };
+        let msg = match mcp::start(port, key, ctx) {
+            Ok(p) => {
+                self.mcp_port = Some(p);
+                format!("MCP server listening on http://127.0.0.1:{p}/mcp")
+            }
+            Err(e) => format!("Failed to start MCP server on port {port}: {e}"),
+        };
+        self.state.lock().unwrap().event("MCP", msg);
     }
 
     fn start_scan(
@@ -457,6 +482,20 @@ impl App {
                     None => {
                         if ui.button("Start REST API (127.0.0.1:1337)").clicked() {
                             self.start_rest(1337, String::new());
+                        }
+                    }
+                }
+                match self.mcp_port {
+                    Some(p) => {
+                        ui.label(format!("MCP server on http://127.0.0.1:{p}/mcp"));
+                    }
+                    None => {
+                        if ui
+                            .button("Start MCP server (127.0.0.1:1338)")
+                            .on_hover_text("Lets AI agents control BurpCraft: claude mcp add --transport http burpcraft http://127.0.0.1:1338/mcp")
+                            .clicked()
+                        {
+                            self.start_mcp(1338, String::new());
                         }
                     }
                 }
@@ -1917,6 +1956,10 @@ impl eframe::App for App {
         self.engage.window(ui.ctx());
         self.scan_window(ui.ctx());
         self.live_audit();
+        let cmds = std::mem::take(&mut self.state.lock().unwrap().ui_cmds);
+        for (what, e) in cmds {
+            self.entry_action(what, e, false);
+        }
         self.run_schedules(ui.ctx());
         if ui.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::S)) {
             match self.project.clone() {

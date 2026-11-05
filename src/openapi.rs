@@ -34,12 +34,23 @@ impl J {
             J::Null => "null".into(),
             J::Bool(b) => b.to_string(),
             J::Num(n) => n.clone(),
-            J::Str(s) => format!(
-                "\"{}\"",
-                s.replace('\\', "\\\\")
-                    .replace('"', "\\\"")
-                    .replace('\n', "\\n")
-            ),
+            J::Str(s) => {
+                let mut o = String::with_capacity(s.len() + 2);
+                o.push('"');
+                for c in s.chars() {
+                    match c {
+                        '"' => o.push_str("\\\""),
+                        '\\' => o.push_str("\\\\"),
+                        '\n' => o.push_str("\\n"),
+                        '\r' => o.push_str("\\r"),
+                        '\t' => o.push_str("\\t"),
+                        c if (c as u32) < 0x20 => o.push_str(&format!("\\u{:04x}", c as u32)),
+                        c => o.push(c),
+                    }
+                }
+                o.push('"');
+                o
+            }
             J::Arr(v) => format!(
                 "[{}]",
                 v.iter().map(J::to_json).collect::<Vec<_>>().join(",")

@@ -25,6 +25,7 @@
   <a href="#quick-start">Quick start</a> ·
   <a href="#self-hosting-the-collaborator-and-bapp-store">Collaborator</a> ·
   <a href="#rest-api">REST API</a> ·
+  <a href="#mcp-server-ai-agents">MCP</a> ·
   <a href="#releases">Releases</a>
 </p>
 
@@ -94,6 +95,32 @@ Then set the server in the **Collaborator** tab (or click **Start built-in serve
 curl -i -X POST -d '{"urls":["http://target.example/"]}' http://127.0.0.1:1337/v0.1/scan   # 201, Location: 1
 curl http://127.0.0.1:1337/v0.1/scan/1                                                     # status and issues
 ```
+
+## MCP server (AI agents)
+
+Agents drive the running app over [MCP](https://modelcontextprotocol.io): read traffic, send and fuzz requests,
+intercept and edit live (MITM), change rules and scope, scan, use the Collaborator. In-process, localhost only, <1 ms per call.
+
+```sh
+BURPCRAFT_MCP=1338 cargo run --release          # or BurpCraft menu → Start MCP server; 1338:<token> requires a bearer token
+claude mcp add --transport http burpcraft http://127.0.0.1:1338/mcp   # + --header "Authorization: Bearer <token>"
+```
+
+| Tool | Does |
+|---|---|
+| `status` | listener, intercept state, counts, CA path |
+| `history_list` / `history_get` | proxy or logger items: filter (host, method, status, regex, `after_id`), full request/response |
+| `ws_list` | WebSocket messages |
+| `send` | raw HTTP/1.1 or HTTP/2 request → response (Repeater) |
+| `intruder` | `§`-marked attack: sniper, battering_ram, pitchfork, cluster_bomb; grep per response |
+| `intercept` · `intercept_queue` · `intercept_forward` · `intercept_drop` | MITM: hold, read, edit-and-forward or drop live requests/responses |
+| `rules` · `scope` | match-and-replace rules, target scope (get, or replace with `set`) |
+| `scan_start` · `scan_status` · `issues` | active scan of URLs or one request, progress, findings |
+| `collaborator` | built-in or remote OAST server, payloads, interactions |
+| `codec` | base64 / url / html / hex, md5 / sha* |
+| `open_in` · `events` | show an item in a UI tool for the human, app event log |
+
+Messages are plain HTTP text (`\n` is fine: CRLF and `Content-Length` are fixed for you). Each tool's own description is the reference.
 
 ## Development
 

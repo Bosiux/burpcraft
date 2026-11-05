@@ -154,8 +154,9 @@ pub fn encode(app: &App) -> Vec<u8> {
         w.s(&r.replace);
         w.s(&r.comment);
     }
-    w.n(app.target.scope.len() as u64);
-    for (enabled, include, prefix) in &app.target.scope {
+    let scope = app.target.scope.lock().unwrap();
+    w.n(scope.len() as u64);
+    for (enabled, include, prefix) in scope.iter() {
         w.n(*enabled as u64);
         w.n(*include as u64);
         w.s(prefix);
@@ -263,7 +264,7 @@ pub fn decode(app: &mut App, data: &[u8]) -> io::Result<()> {
         s.next_id = history.iter().map(|e| e.id).max().unwrap_or(0) + 1;
         (s.history, s.logger, s.ws, s.issues, s.rules) = (history, logger, ws, issues, rules);
     }
-    app.target.scope = scope;
+    *app.target.scope.lock().unwrap() = scope;
     app.repeater = Default::default();
     for (name, host, port, tls, req, resp) in repeater {
         app.repeater.add(host, port, tls, req);
@@ -354,7 +355,11 @@ mod tests {
             });
             s.rules[0].enabled = true;
         }
-        a.target.scope.push((true, true, "https://a.test/".into()));
+        a.target
+            .scope
+            .lock()
+            .unwrap()
+            .push((true, true, "https://a.test/".into()));
         a.repeater
             .add("a.test".into(), 443, true, "GET / HTTP/1.1\r\n\r\n".into());
         a.repeater.tabs[0].resp = "HTTP/1.1 200 OK".into();
