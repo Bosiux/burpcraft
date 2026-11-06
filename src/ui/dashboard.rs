@@ -29,6 +29,7 @@ impl App {
                     cfg = scan::Config {
                         headers: cfg.headers.clone(),
                         login: cfg.login.clone(),
+                        logged_out: cfg.logged_out.clone(),
                         ..scan::Config::fast()
                     };
                 }
@@ -40,6 +41,7 @@ impl App {
                     cfg = scan::Config {
                         headers: cfg.headers.clone(),
                         login: cfg.login.clone(),
+                        logged_out: cfg.logged_out.clone(),
                         ..scan::Config::thorough()
                     };
                 }
@@ -69,6 +71,8 @@ impl App {
                 ui.add(egui::TextEdit::multiline(&mut cfg.headers).desired_rows(2).desired_width(f32::INFINITY));
                 ui.label("Login request (raw HTTP, sent first; its Set-Cookie values join every request):");
                 ui.add(egui::TextEdit::multiline(&mut cfg.login).code_editor().desired_rows(4).desired_width(f32::INFINITY));
+                ui.label("Logged-out response (regex; empty = 401 or a redirect to a login page). On a match the login is re-sent and the request retried:");
+                ui.add(egui::TextEdit::singleline(&mut cfg.logged_out).desired_width(f32::INFINITY));
             });
             ui.collapsing("API definition", |ui| {
                 ui.label("OpenAPI / Swagger file (JSON or YAML) to audit every operation of:");
