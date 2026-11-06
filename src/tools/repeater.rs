@@ -3,7 +3,7 @@ use std::time::Instant;
 
 use eframe::egui::{self, RichText};
 
-use crate::{ui::editor, http::net, proxy, ui::theme};
+use crate::{http::net, proxy, ui::editor, ui::theme};
 
 pub struct RepeaterTab {
     pub name: String,

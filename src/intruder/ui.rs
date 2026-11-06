@@ -5,7 +5,7 @@ use std::time::Instant;
 
 use eframe::egui::{self, RichText};
 
-use crate::{ui::editor, http::net, proxy, ui::theme, tools};
+use crate::{http::net, proxy, tools, ui::editor, ui::theme};
 
 use super::*;
 

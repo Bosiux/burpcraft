@@ -12,7 +12,8 @@ fn http_get(server: &str, path: &str) -> Result<Vec<u8>, String> {
         .map(|(h, p)| (h.to_string(), p.parse().unwrap_or(80)))
         .unwrap_or((server.to_string(), 80));
     let req = format!("GET {path} HTTP/1.1\r\nHost: {server}\r\nConnection: close\r\n\r\n");
-    let resp = crate::http::net::send(&host, port, false, req.as_bytes()).map_err(|e| e.to_string())?;
+    let resp =
+        crate::http::net::send(&host, port, false, req.as_bytes()).map_err(|e| e.to_string())?;
     if !String::from_utf8_lossy(crate::proxy::head(&resp)).starts_with("HTTP/1.1 200") {
         return Err(String::from_utf8_lossy(crate::proxy::head(&resp))
             .lines()

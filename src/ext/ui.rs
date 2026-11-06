@@ -134,7 +134,11 @@ impl Tab {
 
     fn store(&mut self, ui: &mut egui::Ui) {
         if self.store_server.is_empty() {
-            self.store_server = crate::security::collab::client().lock().unwrap().server.clone();
+            self.store_server = crate::security::collab::client()
+                .lock()
+                .unwrap()
+                .server
+                .clone();
         }
         ui.label("BApps are served by a self-hosted burpcraft-server started with --bapps <dir>.");
         ui.horizontal(|ui| {
@@ -194,7 +198,8 @@ impl Tab {
         ui.label(format!("BChecks in {} (*.bcheck). Enabled checks run in active scans and on proxied responses.", crate::security::bcheck::dir().display()));
         ui.horizontal(|ui| {
             if ui.button("New").clicked() {
-                (self.bcheck_sel, self.bcheck_text) = (None, crate::security::bcheck::TEMPLATE.to_string());
+                (self.bcheck_sel, self.bcheck_text) =
+                    (None, crate::security::bcheck::TEMPLATE.to_string());
             }
             if ui.button("Reload from disk").clicked() {
                 *crate::security::bcheck::checks().lock().unwrap() =
@@ -255,7 +260,9 @@ impl Tab {
                         match std::fs::write(&path, &self.bcheck_text) {
                             Ok(()) => {
                                 *crate::security::bcheck::checks().lock().unwrap() =
-                                    crate::security::bcheck::load_dir(&crate::security::bcheck::dir());
+                                    crate::security::bcheck::load_dir(
+                                        &crate::security::bcheck::dir(),
+                                    );
                                 format!("Saved {}", path.display())
                             }
                             Err(e) => format!("Save failed: {e}"),

@@ -195,8 +195,9 @@ fn serve<S: Stream>(
                 Err(e) => error_page(&format!("Error connecting to {host}:{port}: {e}")),
             }
         } else {
-            let use_h2 =
-                tls && state.lock().unwrap().http2 && !crate::http::h2up::known_unsupported(&host, port);
+            let use_h2 = tls
+                && state.lock().unwrap().http2
+                && !crate::http::h2up::known_unsupported(&host, port);
             let h2_req = if use_h2 {
                 crate::http::h2up::to_h2_text(&req)
             } else {

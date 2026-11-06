@@ -1,9 +1,9 @@
 // release builds are a GUI app on Windows: no console window
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
+mod automation;
 mod ext;
 mod http;
 mod intruder;
-mod automation;
 mod mcp;
 mod misc;
 mod project;
@@ -25,9 +25,9 @@ use proxy::{Entry, State};
 use security::{collab, domi};
 use tools::{engage, search, sequencer, target};
 use ui::HistFilter;
-use ui::theme;
 #[cfg(target_os = "macos")]
 use ui::macmenu;
+use ui::theme;
 
 const MAIN_TABS: [&str; 13] = [
     "Dashboard",

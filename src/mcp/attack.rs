@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
 
 use crate::automation::openapi::J;
-use crate::{intruder, http::net, proxy, tools};
+use crate::{http::net, intruder, proxy, tools};
 
 use super::Ctx;
 use super::helpers::{bool_arg, n, num_arg, obj, raw, s, str_arg, strs, target};

@@ -436,7 +436,12 @@ impl BCheck {
         })
     }
     /// Issue for a match (name/description leaked once per load: issues hold `&'static str`).
-    pub fn issue(&self, origin: String, path: String, entry_id: usize) -> crate::security::scanner::Issue {
+    pub fn issue(
+        &self,
+        origin: String,
+        path: String,
+        entry_id: usize,
+    ) -> crate::security::scanner::Issue {
         crate::security::scanner::Issue {
             id: 0,
             name: Box::leak(self.name.clone().into_boxed_str()),

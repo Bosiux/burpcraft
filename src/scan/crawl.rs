@@ -136,8 +136,9 @@ pub(crate) fn crawl(c: &Ctx, start: &str, status: &Mutex<String>) -> Vec<String>
         if path.contains('?') {
             audit.push(req);
         }
-        let ct = crate::http::net::header(&String::from_utf8_lossy(proxy::head(&resp)), "content-type")
-            .unwrap_or_default();
+        let ct =
+            crate::http::net::header(&String::from_utf8_lossy(proxy::head(&resp)), "content-type")
+                .unwrap_or_default();
         if !ct.contains("html") {
             continue;
         }

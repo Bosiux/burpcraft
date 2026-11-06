@@ -169,7 +169,8 @@ pub fn csrf_poc(e: &Entry) -> String {
     let action = format!("{}{}", e.origin(), if get { path } else { &e.url });
     let field = |k: &str, v: &str| {
         let d = |s: &str| {
-            String::from_utf8_lossy(&crate::http::codec::url_decode(&s.replace('+', " "))).into_owned()
+            String::from_utf8_lossy(&crate::http::codec::url_decode(&s.replace('+', " ")))
+                .into_owned()
         };
         format!(
             "      <input type=\"hidden\" name=\"{}\" value=\"{}\" />\n",

@@ -192,7 +192,7 @@ impl NativeMenu {
 mod tests {
     #[test]
     fn ids_map_to_commands() {
-        use crate::{Cmd, cmd};
+        use super::{Cmd, cmd};
         assert!(matches!(cmd("save"), Some(Cmd::SaveProject)));
         assert!(matches!(cmd("tab:Proxy"), Some(Cmd::Tab("Proxy"))));
         assert!(cmd("tab:Nope").is_none() && cmd("bogus").is_none());

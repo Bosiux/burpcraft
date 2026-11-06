@@ -211,7 +211,10 @@ fn audit_point(c: &Ctx, req: &str, p: &Point, base: &(Vec<u8>, Duration)) {
         }
         if c.cfg.on("Out-of-band interactions (Collaborator)") {
             let label = format!("Scan {} {lab} xxe {}", c.task, p.start);
-            let host = crate::security::collab::client().lock().unwrap().payload(&label);
+            let host = crate::security::collab::client()
+                .lock()
+                .unwrap()
+                .payload(&label);
             if let Some(host) = host {
                 let r = xxe_inject(req, p, &format!("http://{host}/"));
                 if c.send(&r).is_some() {

@@ -6,8 +6,8 @@
 //!
 //! The tool descriptions in `TOOLS` are the documentation agents read: keep them short and exact.
 use crate::automation::openapi::{self, J};
-use crate::proxy::State;
 use crate::automation::rest::Tasks;
+use crate::proxy::State;
 use crate::tools::target::Scope;
 
 mod attack;
