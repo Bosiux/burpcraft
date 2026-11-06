@@ -988,7 +988,11 @@ impl App {
         ui.horizontal(|ui| {
             let has = front.is_some();
             let fwd = theme::split_button(ui, "Forward", has, |ui| {
-                if ui.button("Forward all").clicked() {
+                if ui
+                    .button("Forward all")
+                    .on_hover_text("Release every held message; intercept stays on")
+                    .clicked()
+                {
                     // the message on screen goes as edited, the rest unchanged
                     decision = Some(
                         self.intercept_text

@@ -224,6 +224,10 @@ pub fn split_button(
                 .min_size(size)
                 .corner_radius(right),
         );
+        // the arrow has no text, so name it for screen readers
+        let name = format!("{label} options");
+        arrow.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, enabled, &name));
+        let arrow = arrow.on_hover_text(&name);
         let c = arrow.rect.center();
         let color = if enabled {
             Color32::WHITE

@@ -78,7 +78,7 @@ cargo run --release -- my.burpcraft     # open or create a project file
 BURPCRAFT_API=1337 cargo run --release  # also start the REST API on 127.0.0.1:1337
 ```
 
-Point your browser at `127.0.0.1:8080` and trust `~/.burpcraft/ca.pem`, or use **Proxy → Intercept → Open browser**.
+Point your browser at `127.0.0.1:8080` (or your `BURPCRAFT_PROXY` port) and trust `~/.burpcraft/ca.pem`, or use **Proxy → Intercept → Open browser**.
 
 ## Self-hosting the Collaborator and BApp Store
 
