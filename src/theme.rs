@@ -258,3 +258,53 @@ pub fn frame_chrome() -> egui::Frame {
 pub fn heading(ui: &mut egui::Ui, text: &str) {
     ui.label(RichText::new(text).size(15.0).strong().color(ORANGE_DARK));
 }
+
+/// A borderless native OS window (not confined to the main one) with our own draggable title bar.
+/// Drop-in for `egui::Window`: `open` turns false when the user closes it.
+pub fn window<R>(
+    ctx: &egui::Context,
+    title: &str,
+    size: impl Into<egui::Vec2>,
+    open: &mut bool,
+    add: impl FnOnce(&mut egui::Ui) -> R,
+) -> Option<R> {
+    let mut add = Some(add);
+    let builder = egui::ViewportBuilder::default()
+        .with_title(title)
+        .with_inner_size(size)
+        .with_min_inner_size([240.0, 120.0])
+        .with_decorations(false)
+        .with_resizable(true);
+    ctx.show_viewport_immediate(egui::ViewportId::from_hash_of(title), builder, |ui, _| {
+        if ui.input(|i| i.viewport().close_requested()) {
+            *open = false;
+        }
+        egui::Panel::top("titlebar")
+            .frame(frame_chrome())
+            .show(ui, |ui| {
+                let bar = ui.interact(
+                    ui.max_rect(),
+                    ui.scope_id().with("drag"),
+                    egui::Sense::click_and_drag(),
+                );
+                if bar.drag_started() {
+                    ui.ctx().send_viewport_cmd(egui::ViewportCommand::StartDrag);
+                }
+                ui.horizontal(|ui| {
+                    ui.add(egui::Label::new(RichText::new(title).strong()).selectable(false));
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui
+                            .add(egui::Button::new("✕").frame(false))
+                            .on_hover_text("Close")
+                            .clicked()
+                        {
+                            *open = false;
+                        }
+                    });
+                });
+            });
+        egui::CentralPanel::default()
+            .show(ui, |ui| add.take().map(|f| f(ui)))
+            .inner
+    })
+}

@@ -1222,17 +1222,7 @@ pub fn open_in_browser(html: &str, base: Option<&str>) -> std::io::Result<()> {
     }
     page += html;
     std::fs::write(&path, page)?;
-    let opener = if cfg!(target_os = "macos") {
-        "open"
-    } else if cfg!(windows) {
-        "explorer"
-    } else {
-        "xdg-open"
-    };
-    std::process::Command::new(opener)
-        .arg(&path)
-        .spawn()
-        .map(|_| ())
+    crate::misc::open_external(&path)
 }
 
 #[cfg(test)]

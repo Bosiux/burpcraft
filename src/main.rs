@@ -10,6 +10,8 @@ mod engage;
 mod ext;
 mod h2up;
 mod intruder;
+#[cfg(target_os = "macos")]
+mod macmenu;
 mod mcp;
 mod misc;
 mod net;
@@ -26,6 +28,7 @@ mod sequencer;
 mod target;
 mod theme;
 mod tools;
+mod update;
 
 use std::sync::Arc;
 
@@ -49,6 +52,21 @@ const MAIN_TABS: [&str; 13] = [
     "Extensions",
     "Learn",
 ];
+/// Menu commands, shared by the in-window menu and the macOS system menu bar.
+#[derive(Clone, Copy)]
+enum Cmd {
+    Settings,
+    StartRest,
+    StartMcp,
+    Exit,
+    OpenProject,
+    SaveProject,
+    SaveProjectAs,
+    Intercept,
+    NewRepeater,
+    Search,
+    Tab(&'static str),
+}
 const PROXY_TABS: [&str; 5] = [
     "Intercept",
     "HTTP history",
@@ -80,6 +98,7 @@ struct App {
     ws_sel: Option<usize>,
     issue_sel: Option<usize>,
     flash: Option<&'static str>,
+    update_dismissed: bool,
     comment_edit: Option<(usize, String)>,
     frames: u32,
     /// Open project file: Ctrl+S and exit save here.
@@ -94,6 +113,9 @@ struct App {
     rest_port: Option<u16>,
     /// MCP server port while it runs.
     mcp_port: Option<u16>,
+    /// macOS: the menu in the system menu bar (elsewhere it is drawn inside the window).
+    #[cfg(target_os = "macos")]
+    native_menu: Option<macmenu::NativeMenu>,
     /// New scan dialog: (URLs, config, API definition path, schedule "HH:MM" or empty, repeat hours).
     scan_dlg: Option<(String, scan::Config, String, String, u32)>,
     /// Scheduled scans: (next run, repeat hours (0 = once), URLs, config).
@@ -146,7 +168,12 @@ impl App {
             ..Self::blank(state)
         };
         app.settings.dark = dark;
+        #[cfg(target_os = "macos")]
+        {
+            app.native_menu = Some(macmenu::NativeMenu::new(&cc.egui_ctx));
+        }
         ext::init(app.state.clone());
+        update::start(cc.egui_ctx.clone());
         // BURPCRAFT_API=port[:key] starts the REST API (e.g. for CI)
         if let Ok(v) = std::env::var("BURPCRAFT_API") {
             let (port, key) = v.split_once(':').unwrap_or((&v, ""));
@@ -198,6 +225,7 @@ impl App {
             ws_sel: None,
             issue_sel: None,
             flash: None,
+            update_dismissed: false,
             comment_edit: None,
             frames: 0,
             project: None,
@@ -208,6 +236,8 @@ impl App {
             scans: Default::default(),
             rest_port: None,
             mcp_port: None,
+            #[cfg(target_os = "macos")]
+            native_menu: None,
             scan_dlg: None,
             schedules: vec![],
             live_active: false,
@@ -321,19 +351,39 @@ impl App {
             return;
         };
         let (mut open, mut go) = (true, false);
-        egui::Window::new("New scan").open(&mut open).default_width(560.0).show(ctx, |ui| {
+        theme::window(ctx, "New scan", [560.0, 640.0], &mut open, |ui| {
             ui.label("URLs to scan (one per line):");
-            ui.add(egui::TextEdit::multiline(&mut urls).desired_rows(3).desired_width(f32::INFINITY).hint_text("https://target.example/"));
+            ui.add(
+                egui::TextEdit::multiline(&mut urls)
+                    .desired_rows(3)
+                    .desired_width(f32::INFINITY)
+                    .hint_text("https://target.example/"),
+            );
             ui.horizontal(|ui| {
                 ui.label("Scan configuration:");
                 if ui.button("Fast").clicked() {
-                    cfg = scan::Config { headers: cfg.headers.clone(), login: cfg.login.clone(), ..scan::Config::fast() };
+                    cfg = scan::Config {
+                        headers: cfg.headers.clone(),
+                        login: cfg.login.clone(),
+                        ..scan::Config::fast()
+                    };
                 }
-                if ui.button("Thorough").on_hover_text("Adds time-based checks and crawls up to 500 pages").clicked() {
-                    cfg = scan::Config { headers: cfg.headers.clone(), login: cfg.login.clone(), ..scan::Config::thorough() };
+                if ui
+                    .button("Thorough")
+                    .on_hover_text("Adds time-based checks and crawls up to 500 pages")
+                    .clicked()
+                {
+                    cfg = scan::Config {
+                        headers: cfg.headers.clone(),
+                        login: cfg.login.clone(),
+                        ..scan::Config::thorough()
+                    };
                 }
             });
-            ui.checkbox(&mut cfg.crawl, "Crawl from the URLs (otherwise audit them only)");
+            ui.checkbox(
+                &mut cfg.crawl,
+                "Crawl from the URLs (otherwise audit them only)",
+            );
             egui::Grid::new("checks").num_columns(3).show(ui, |ui| {
                 for (i, name) in scan::CHECKS.iter().enumerate() {
                     ui.checkbox(&mut cfg.checks[i], *name);
@@ -358,7 +408,11 @@ impl App {
             });
             ui.collapsing("API definition", |ui| {
                 ui.label("OpenAPI / Swagger JSON file to audit every operation of:");
-                ui.add(egui::TextEdit::singleline(&mut api).hint_text("/path/to/openapi.json").desired_width(f32::INFINITY));
+                ui.add(
+                    egui::TextEdit::singleline(&mut api)
+                        .hint_text("/path/to/openapi.json")
+                        .desired_width(f32::INFINITY),
+                );
             });
             ui.collapsing("Schedule", |ui| {
                 ui.horizontal(|ui| {
@@ -369,7 +423,15 @@ impl App {
                     ui.label("hours (0 = once)");
                 });
             });
-            go = theme::primary_button(ui, if at.trim().is_empty() { "Scan" } else { "Schedule scan" }).clicked();
+            go = theme::primary_button(
+                ui,
+                if at.trim().is_empty() {
+                    "Scan"
+                } else {
+                    "Schedule scan"
+                },
+            )
+            .clicked();
         });
         if go {
             let list: Vec<String> = urls
@@ -430,35 +492,37 @@ impl App {
         };
         let mut open = true;
         let mut done = false;
-        egui::Window::new(if saving {
-            "Save project"
-        } else {
-            "Open project"
-        })
-        .open(&mut open)
-        .collapsible(false)
-        .resizable(false)
-        .show(ctx, |ui| {
-            ui.label("Project file:");
-            ui.add(egui::TextEdit::singleline(&mut path).desired_width(420.0));
-            if !msg.is_empty() {
-                ui.label(RichText::new(&msg).color(theme::muted()));
-            }
-            if ui.button(if saving { "Save" } else { "Open" }).clicked() {
-                let p = std::path::PathBuf::from(path.trim());
-                let result = if saving {
-                    self.save_project(p)
-                } else {
-                    project::open(self, &p)
-                        .map(|()| self.project = Some(p))
-                        .map_err(|e| format!("Failed to open: {e}"))
-                };
-                match result {
-                    Ok(()) => done = true,
-                    Err(e) => msg = e,
+        theme::window(
+            ctx,
+            if saving {
+                "Save project"
+            } else {
+                "Open project"
+            },
+            [460.0, 160.0],
+            &mut open,
+            |ui| {
+                ui.label("Project file:");
+                ui.add(egui::TextEdit::singleline(&mut path).desired_width(420.0));
+                if !msg.is_empty() {
+                    ui.label(RichText::new(&msg).color(theme::muted()));
                 }
-            }
-        });
+                if ui.button(if saving { "Save" } else { "Open" }).clicked() {
+                    let p = std::path::PathBuf::from(path.trim());
+                    let result = if saving {
+                        self.save_project(p)
+                    } else {
+                        project::open(self, &p)
+                            .map(|()| self.project = Some(p))
+                            .map_err(|e| format!("Failed to open: {e}"))
+                    };
+                    match result {
+                        Ok(()) => done = true,
+                        Err(e) => msg = e,
+                    }
+                }
+            },
+        );
         if open && !done {
             self.project_dlg = Some((saving, path, msg));
         }
@@ -474,100 +538,106 @@ impl App {
         self.flash = Some("Repeater");
     }
 
-    fn menu(&mut self, ui: &mut egui::Ui) {
-        egui::MenuBar::new().ui(ui, |ui| {
-            ui.menu_button("BurpCraft", |ui| {
-                if ui.button("Settings").clicked() {
-                    self.settings.open = true;
+    fn run(&mut self, ctx: &egui::Context, cmd: Cmd) {
+        let current = || {
+            self.project
+                .clone()
+                .unwrap_or_else(project::default_path)
+                .display()
+                .to_string()
+        };
+        match cmd {
+            Cmd::Settings => self.settings.open = true,
+            Cmd::StartRest => self.start_rest(1337, String::new()),
+            Cmd::StartMcp => self.start_mcp(1338, String::new()),
+            Cmd::Exit => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
+            Cmd::OpenProject => self.project_dlg = Some((false, current(), String::new())),
+            Cmd::SaveProject => match self.project.clone() {
+                Some(p) => {
+                    if let Err(e) = self.save_project(p) {
+                        self.state.lock().unwrap().event("Project", e);
+                    }
                 }
+                None => self.project_dlg = Some((true, current(), String::new())),
+            },
+            Cmd::SaveProjectAs => self.project_dlg = Some((true, current(), String::new())),
+            Cmd::Intercept => {
+                let mut s = self.state.lock().unwrap();
+                s.intercept = !s.intercept;
+            }
+            Cmd::NewRepeater => {
+                self.repeater.add(String::new(), 80, false, String::new());
+                self.tab = "Repeater";
+            }
+            Cmd::Search => self.search.open = true,
+            Cmd::Tab(t) => self.tab = t,
+        }
+    }
+
+    /// In-window menu bar (Windows/Linux); macOS uses `macmenu` in the system menu bar.
+    #[cfg_attr(target_os = "macos", allow(dead_code))]
+    fn menu(&mut self, ui: &mut egui::Ui) {
+        let mut cmd = None;
+        egui::MenuBar::new().ui(ui, |ui| {
+            let mut pick = |r: egui::Response, c: Cmd| {
+                if r.clicked() {
+                    cmd = Some(c);
+                }
+            };
+            ui.menu_button("BurpCraft", |ui| {
+                pick(ui.button("Settings"), Cmd::Settings);
                 match self.rest_port {
                     Some(p) => {
                         ui.label(format!("REST API on http://127.0.0.1:{p}/v0.1/"));
                     }
-                    None => {
-                        if ui.button("Start REST API (127.0.0.1:1337)").clicked() {
-                            self.start_rest(1337, String::new());
-                        }
-                    }
+                    None => pick(ui.button("Start REST API (127.0.0.1:1337)"), Cmd::StartRest),
                 }
                 match self.mcp_port {
                     Some(p) => {
                         ui.label(format!("MCP server on http://127.0.0.1:{p}/mcp"));
                     }
                     None => {
-                        if ui
-                            .button("Start MCP server (127.0.0.1:1338)")
-                            .on_hover_text("Lets AI agents control BurpCraft: claude mcp add --transport http burpcraft http://127.0.0.1:1338/mcp")
-                            .clicked()
-                        {
-                            self.start_mcp(1338, String::new());
-                        }
+                        pick(
+                            ui.button("Start MCP server (127.0.0.1:1338)")
+                                .on_hover_text("Lets AI agents control BurpCraft: claude mcp add --transport http burpcraft http://127.0.0.1:1338/mcp"),
+                            Cmd::StartMcp,
+                        );
                     }
                 }
                 ui.separator();
-                if ui.button("Exit").clicked() {
-                    ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
-                }
+                pick(ui.button("Exit"), Cmd::Exit);
             });
             ui.menu_button("Project", |ui| {
-                let current = self
-                    .project
-                    .clone()
-                    .unwrap_or_else(project::default_path)
-                    .display()
-                    .to_string();
-                if ui.button("Open project...").clicked() {
-                    self.project_dlg = Some((false, current.clone(), String::new()));
-                }
-                if ui.button("Save project  (Ctrl+S)").clicked() {
-                    match self.project.clone() {
-                        Some(p) => {
-                            if let Err(e) = self.save_project(p) {
-                                self.state.lock().unwrap().event("Project", e);
-                            }
-                        }
-                        None => self.project_dlg = Some((true, current.clone(), String::new())),
-                    }
-                }
-                if ui.button("Save project as...").clicked() {
-                    self.project_dlg = Some((true, current, String::new()));
-                }
+                pick(ui.button("Open project..."), Cmd::OpenProject);
+                pick(ui.button("Save project  (Ctrl+S)"), Cmd::SaveProject);
+                pick(ui.button("Save project as..."), Cmd::SaveProjectAs);
                 ui.separator();
-                let mut s = self.state.lock().unwrap();
-                let label = if s.intercept {
+                let label = if self.state.lock().unwrap().intercept {
                     "Intercept is on"
                 } else {
                     "Intercept is off"
                 };
-                if ui.button(label).clicked() {
-                    s.intercept = !s.intercept;
-                }
+                pick(ui.button(label), Cmd::Intercept);
             });
             ui.menu_button("Intruder", |ui| {
                 ui.add_enabled(false, egui::Button::new("Start attack"));
             });
-            ui.menu_button("Repeater", |ui| {
-                if ui.button("New tab").clicked() {
-                    self.repeater.add(String::new(), 80, false, String::new());
-                    self.tab = "Repeater";
-                }
-            });
+            ui.menu_button("Repeater", |ui| pick(ui.button("New tab"), Cmd::NewRepeater));
             ui.menu_button("Search", |ui| {
-                if ui.button("Search all tools  (Ctrl+Shift+F)").clicked() {
-                    self.search.open = true;
-                }
+                pick(ui.button("Search all tools  (Ctrl+Shift+F)"), Cmd::Search)
             });
             ui.menu_button("View", |ui| {
                 for t in MAIN_TABS {
-                    if ui.button(t).clicked() {
-                        self.tab = t;
-                    }
+                    pick(ui.button(t), Cmd::Tab(t));
                 }
             });
             ui.menu_button("Help", |ui| {
                 ui.label("BurpCraft — a Rust/egui web security testing proxy");
             });
         });
+        if let Some(c) = cmd {
+            self.run(ui.ctx(), c);
+        }
     }
 
     fn main_tabs(&mut self, ui: &mut egui::Ui) {
@@ -665,7 +735,7 @@ impl App {
                             let msg = match report::write(&s.issues, &s.history, html) {
                                 Ok(p) => {
                                     if html {
-                                        let _ = std::process::Command::new(if cfg!(target_os = "macos") { "open" } else if cfg!(windows) { "explorer" } else { "xdg-open" }).arg(&p).spawn();
+                                        let _ = misc::open_external(&p);
                                     }
                                     format!("Report written to {}", p.display())
                                 }
@@ -1064,10 +1134,13 @@ impl App {
         });
         if self.hfilter_open {
             let mut open = true;
-            egui::Window::new("HTTP history filter")
-                .open(&mut open)
-                .collapsible(false)
-                .show(ui.ctx(), |ui| self.hfilter.ui(ui));
+            theme::window(
+                ui.ctx(),
+                "HTTP history filter",
+                [640.0, 420.0],
+                &mut open,
+                |ui| self.hfilter.ui(ui),
+            );
             self.hfilter_open = open;
         }
         let sel = self
@@ -1099,13 +1172,10 @@ impl App {
         if let Some((id, text)) = &mut self.comment_edit {
             let mut open = true;
             let mut ok = false;
-            egui::Window::new("Add comment")
-                .collapsible(false)
-                .open(&mut open)
-                .show(ui.ctx(), |ui| {
-                    ui.text_edit_singleline(text);
-                    ok = theme::primary_button(ui, "OK").clicked();
-                });
+            theme::window(ui.ctx(), "Add comment", [360.0, 110.0], &mut open, |ui| {
+                ui.text_edit_singleline(text);
+                ok = theme::primary_button(ui, "OK").clicked();
+            });
             if ok {
                 let mut s = self.state.lock().unwrap();
                 if let Some(e) = s.history.iter_mut().find(|e| e.id == *id) {
@@ -1961,9 +2031,25 @@ impl eframe::App for App {
                 }
             }
         }
+        #[cfg(not(target_os = "macos"))]
         egui::Panel::top("menu")
             .frame(theme::frame_chrome())
             .show(ui, |ui| self.menu(ui));
+        #[cfg(target_os = "macos")]
+        {
+            let cmds = self
+                .native_menu
+                .as_ref()
+                .map(|m| m.poll())
+                .unwrap_or_default();
+            for c in cmds {
+                self.run(ui.ctx(), c);
+            }
+            let intercept = self.state.lock().unwrap().intercept;
+            if let Some(m) = &mut self.native_menu {
+                m.sync(self.rest_port, self.mcp_port, intercept);
+            }
+        }
         egui::Panel::top("tabs")
             .frame(
                 egui::Frame::new()
@@ -1971,6 +2057,7 @@ impl eframe::App for App {
                     .inner_margin(egui::Margin::symmetric(6, 0)),
             )
             .show(ui, |ui| self.main_tabs(ui));
+        update::popup(ui.ctx(), &mut self.update_dismissed);
         self.intruder.windows(ui.ctx());
         self.project_window(ui.ctx());
         self.search_window(ui.ctx());
@@ -1983,20 +2070,7 @@ impl eframe::App for App {
         }
         self.run_schedules(ui.ctx());
         if ui.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::S)) {
-            match self.project.clone() {
-                Some(p) => {
-                    if let Err(e) = self.save_project(p) {
-                        self.state.lock().unwrap().event("Project", e);
-                    }
-                }
-                None => {
-                    self.project_dlg = Some((
-                        true,
-                        project::default_path().display().to_string(),
-                        String::new(),
-                    ))
-                }
-            }
+            self.run(ui.ctx(), Cmd::SaveProject);
         }
         if self.settings.open && self.settings.window(ui.ctx(), &self.state) {
             theme::apply(ui.ctx(), self.settings.dark, self.settings.font_size);
