@@ -4,7 +4,7 @@
 use eframe::egui::{self, RichText};
 use egui_extras::{Column, TableBuilder};
 
-use crate::{ai, misc, next_time, openapi, report, scan, scanner, theme, App};
+use crate::{App, ai, misc, next_time, openapi, report, scan, scanner, theme};
 
 impl App {
     pub(crate) fn scan_window(&mut self, ctx: &egui::Context) {

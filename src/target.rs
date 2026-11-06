@@ -139,7 +139,7 @@ impl Target {
             .default_size(h * 0.4)
             .show(ui, |ui| {
                 if let Some(a) =
-                    crate::history_table(ui, "sitemap", &items, &mut self.selected_item, false)
+                    crate::ui::history_table(ui, "sitemap", &items, &mut self.selected_item, false)
                 {
                     action = Some(a);
                 }

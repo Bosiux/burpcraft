@@ -3,4 +3,9 @@
 //! `App` struct, its init, the frame loop and command dispatch.
 
 mod dashboard;
+mod history;
+mod history_table;
 mod proxy;
+
+pub(crate) use history::HistFilter;
+pub(crate) use history_table::history_table;
