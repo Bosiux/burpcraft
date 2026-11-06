@@ -208,7 +208,7 @@ pub fn passive(e: &Entry) -> Vec<Issue> {
             "Do not deserialize untrusted input; use a data-only format (JSON) with a fixed schema, or sign and verify any serialized state before deserializing it.",
         );
     }
-    if let Some(ty) = serialized_signal(&proxy::body_bytes(&e.resp)) {
+    if let Some(ty) = serialized_signal(&e.resp) {
         add(
             "Serialized object in response",
             Severity::Info,
@@ -231,17 +231,29 @@ pub fn passive(e: &Entry) -> Vec<Issue> {
     out
 }
 
-/// Names the serialized-object format a blob looks like, or `None`. Reliable signatures only:
+/// Names the serialized-object format an HTTP message carries, or `None`. Reliable signatures only:
 /// Java (raw/base64/hex magic), PHP serialize, Python pickle (protocol 2+ base64).
-fn serialized_signal(data: &[u8]) -> Option<&'static str> {
-    if data.windows(4).any(|w| w == [0xac, 0xed, 0x00, 0x05]) {
+/// Raw Java magic counts only at the start of the body; text signatures only at the start of a
+/// token, so the same letters inside random base64 (session ids, JWTs) don't match.
+fn serialized_signal(msg: &[u8]) -> Option<&'static str> {
+    let body = proxy::body_bytes(msg);
+    if body.starts_with(&[0xac, 0xed, 0x00, 0x05]) {
         return Some("Java");
     }
-    let s = String::from_utf8_lossy(data);
-    if s.contains("rO0AB") || s.contains("aced0005") {
+    // headers (cookies, query) plus the decoded body, so gzip/chunked bodies are searched too
+    let s = String::from_utf8_lossy(proxy::head(msg)) + String::from_utf8_lossy(&body);
+    let token = |sig: &str| {
+        s.match_indices(sig).any(|(i, _)| {
+            !s[..i]
+                .chars()
+                .next_back()
+                .is_some_and(|c| c.is_ascii_alphanumeric() || c == '+' || c == '/')
+        })
+    };
+    if token("rO0AB") || token("aced0005") {
         return Some("Java");
     }
-    if s.contains("gASV") {
+    if token("gASV") {
         return Some("Python pickle");
     }
     if php_serialized(&s) {
@@ -346,10 +358,11 @@ mod tests {
     #[test]
     fn serialized_objects() {
         assert_eq!(serialized_signal(b"token=rO0ABXNy..."), Some("Java"));
-        assert_eq!(
-            serialized_signal(&[0xac, 0xed, 0x00, 0x05, 1, 2]),
-            Some("Java")
-        );
+        let mut raw = b"POST / HTTP/1.1\r\nContent-Length: 6\r\n\r\n".to_vec();
+        raw.extend([0xac, 0xed, 0x00, 0x05, 1, 2]);
+        assert_eq!(serialized_signal(&raw), Some("Java"));
+        // inside a random token (session id, JWT) the same letters are not a signal
+        assert_eq!(serialized_signal(b"session=Zk9gASVq1rO0ABx"), None);
         assert_eq!(serialized_signal(b"d=gASVZ...."), Some("Python pickle"));
         assert_eq!(serialized_signal(b"x=O:8:\"stdClass\":0:{}"), Some("PHP"));
         assert_eq!(serialized_signal(b"x=a:2:{i:0;s:1:\"a\";}"), Some("PHP"));
