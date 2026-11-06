@@ -193,7 +193,77 @@ pub fn passive(e: &Entry) -> Vec<Issue> {
             "Review whether these addresses need to appear in responses.",
         );
     }
+
+    // Insecure deserialization: a serialized object the server receives is attacker-controlled, so
+    // a vulnerable deserializer can be driven to run code; one it emits leaks internal state.
+    if let Some(ty) = serialized_signal(&e.req) {
+        add(
+            "Serialized object in request",
+            Severity::Medium,
+            "Tentative",
+            format!(
+                "The request carries what looks like a serialized {ty} object. If the server deserializes it without validation, an attacker can tamper with it to trigger insecure deserialization."
+            ),
+            "Deserializing attacker-controlled data can let an attacker instantiate arbitrary objects and, through gadget chains, run code on the server.",
+            "Do not deserialize untrusted input; use a data-only format (JSON) with a fixed schema, or sign and verify any serialized state before deserializing it.",
+        );
+    }
+    if let Some(ty) = serialized_signal(&proxy::body_bytes(&e.resp)) {
+        add(
+            "Serialized object in response",
+            Severity::Info,
+            "Tentative",
+            format!("The response body contains what looks like a serialized {ty} object."),
+            "Exposing serialized server-side objects reveals internal types and may be replayed back to a vulnerable deserializer.",
+            "Return data-only formats (JSON) rather than native serialized objects.",
+        );
+    }
+    if body.contains("__VIEWSTATE") && !body.contains("__VIEWSTATEGENERATOR") {
+        add(
+            "ASP.NET ViewState without generator field",
+            Severity::Info,
+            "Tentative",
+            "The page includes a __VIEWSTATE field but no __VIEWSTATEGENERATOR, which can indicate ViewState MAC protection is disabled.".into(),
+            "An unprotected (un-MAC'd) ViewState is attacker-modifiable and has led to remote code execution on ASP.NET applications.",
+            "Keep ViewState MAC enabled (the default) and set a fixed, secret machine key.",
+        );
+    }
     out
+}
+
+/// Names the serialized-object format a blob looks like, or `None`. Reliable signatures only:
+/// Java (raw/base64/hex magic), PHP serialize, Python pickle (protocol 2+ base64).
+fn serialized_signal(data: &[u8]) -> Option<&'static str> {
+    if data.windows(4).any(|w| w == [0xac, 0xed, 0x00, 0x05]) {
+        return Some("Java");
+    }
+    let s = String::from_utf8_lossy(data);
+    if s.contains("rO0AB") || s.contains("aced0005") {
+        return Some("Java");
+    }
+    if s.contains("gASV") {
+        return Some("Python pickle");
+    }
+    if php_serialized(&s) {
+        return Some("PHP");
+    }
+    None
+}
+
+/// True if `s` contains a PHP serialized object (`O:<n>:"`) or array (`a:<n>:{`).
+fn php_serialized(s: &str) -> bool {
+    for (pat, tail) in [("O:", ":\""), ("a:", ":{")] {
+        let mut from = 0;
+        while let Some(p) = s[from..].find(pat) {
+            let rest = &s[from + p + pat.len()..];
+            let digits = rest.chars().take_while(|c| c.is_ascii_digit()).count();
+            if digits > 0 && rest[digits..].starts_with(tail) {
+                return true;
+            }
+            from += p + pat.len();
+        }
+    }
+    false
 }
 
 fn find_emails(body: &str) -> Vec<String> {
@@ -271,5 +341,20 @@ mod tests {
         assert_eq!(find_emails("x a.b@c.io, @bad, n@x.y1"), ["a.b@c.io"]);
         // multibyte characters right before '@' (e.g. lossy-decoded binary) must not split a char
         assert_eq!(find_emails("\u{fffd}@x.io é@y.io"), Vec::<String>::new());
+    }
+
+    #[test]
+    fn serialized_objects() {
+        assert_eq!(serialized_signal(b"token=rO0ABXNy..."), Some("Java"));
+        assert_eq!(
+            serialized_signal(&[0xac, 0xed, 0x00, 0x05, 1, 2]),
+            Some("Java")
+        );
+        assert_eq!(serialized_signal(b"d=gASVZ...."), Some("Python pickle"));
+        assert_eq!(serialized_signal(b"x=O:8:\"stdClass\":0:{}"), Some("PHP"));
+        assert_eq!(serialized_signal(b"x=a:2:{i:0;s:1:\"a\";}"), Some("PHP"));
+        assert_eq!(serialized_signal(b"name=alice&age=30"), None);
+        // "a:" without the structural tail must not match
+        assert!(!php_serialized("a: value, b: other"));
     }
 }

@@ -25,6 +25,7 @@ mod scan;
 mod scanner;
 mod search;
 mod sequencer;
+mod smuggle;
 mod target;
 mod theme;
 mod tools;

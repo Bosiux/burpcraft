@@ -46,7 +46,7 @@ into `<OUT>.png` with sample traffic (uses the BURPCRAFT_SHOT / BURPCRAFT_TAB de
 
 ## Not covered (larger efforts, decide before starting)
 - [ ] Native fallback render: no JavaScript (needs a JS engine + DOM; the Chromium engine covers it), no floats/positioning, flex/grid are equal-width columns only
-- [ ] Scanner: no stored XSS, DOM checks only via DOM Invader, no HTTP request smuggling / deserialization / XXE checks
+- [ ] Scanner: no stored XSS, DOM checks only via DOM Invader, no XXE checks
 - [ ] API scanning: JSON definitions only (no YAML); BChecks: subset of the original syntax (no loops, variables, `run for each`)
 - [ ] BurpCraft AI: a live answer was not exercised on the dev machine (no Anthropic API key there)
 - [ ] Project files are written on save/exit, not continuously like a disk-based project
@@ -71,8 +71,8 @@ Status: ✅ done · 🟡 partial · ❌ missing
 ### Local only (no server)
 | Feature | What it does | BurpCraft |
 |---|---|---|
-| Passive scanner | Analyses proxied traffic without sending anything | ✅ |
-| Active scanner | Sends attack payloads to parameters: SQLi (error/boolean/time), reflected & stored XSS, path traversal, command injection, header injection, open redirect... | ✅ query/body/cookie/JSON/header points; SQLi error/boolean/time, reflected XSS, path traversal, SSTI, open redirect, header injection, command injection (time/OOB), SSRF (OOB). No stored XSS yet |
+| Passive scanner | Analyses proxied traffic without sending anything | ✅ (incl. insecure-deserialization signals: Java/PHP/Python-pickle serialized objects in requests/responses/cookies, ASP.NET ViewState without generator) |
+| Active scanner | Sends attack payloads to parameters: SQLi (error/boolean/time), reflected & stored XSS, path traversal, command injection, header injection, open redirect... | ✅ query/body/cookie/JSON/header points; SQLi error/boolean/time, reflected XSS, path traversal, SSTI, open redirect, header injection, command injection (time/OOB), SSRF (OOB), HTTP request smuggling (CL.TE/TE.CL timing, per host). No stored XSS yet |
 | Crawler | Explores the site following links and forms, fills the site map | ✅ BFS, same origin, GET/POST forms, static files skipped |
 | Scan configurations | Fast/thorough profiles, chosen checks, rate limits | ✅ New scan dialog: Fast/Thorough, per-check toggles, pages, threads, delay |
 | Live tasks | Automatic audit (passive or active) of traffic as it passes the proxy | ✅ passive always; "New live task" = active audit of in-scope proxied requests |

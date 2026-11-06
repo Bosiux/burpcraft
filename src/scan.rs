@@ -151,7 +151,7 @@ pub fn inject(req: &str, p: &Point, value: &str) -> String {
 
 // ------------------------------------------------------------ configuration
 
-pub const CHECKS: [&str; 9] = [
+pub const CHECKS: [&str; 10] = [
     "SQL injection",
     "Cross-site scripting (reflected)",
     "OS command injection",
@@ -161,6 +161,7 @@ pub const CHECKS: [&str; 9] = [
     "HTTP response header injection",
     "Out-of-band interactions (Collaborator)",
     "Time-based checks (slow)",
+    "HTTP request smuggling (timing)",
 ];
 
 #[derive(Clone)]
@@ -179,7 +180,8 @@ pub struct Config {
 impl Config {
     pub fn fast() -> Self {
         let mut checks = [true; CHECKS.len()];
-        checks[8] = false;
+        checks[8] = false; // time-based checks (slow)
+        checks[9] = false; // request smuggling (slow, timing-based)
         Self {
             checks,
             crawl: true,
@@ -417,6 +419,23 @@ impl Ctx {
             }
         }
     }
+
+    /// Timing-based request smuggling (CL.TE / TE.CL), once per target.
+    fn host_smuggle(&self) {
+        if self.stop.load(Ordering::SeqCst) || !self.cfg.on("HTTP request smuggling (timing)") {
+            return;
+        }
+        if let Some(f) = crate::smuggle::detect(&self.target, Duration::from_secs(10)) {
+            self.report(
+                "HTTP request smuggling",
+                Severity::High,
+                "Tentative",
+                f.detail,
+                &f.req,
+                &[],
+            );
+        }
+    }
 }
 
 fn advice(name: &str) -> (&'static str, &'static str) {
@@ -452,6 +471,10 @@ fn advice(name: &str) -> (&'static str, &'static str) {
         "External service interaction" => (
             "The server made a network request (DNS/HTTP) to a domain supplied in the input, a sign of SSRF or blind injection.",
             "Do not fetch URLs or resolve hosts from input; if needed, use a strict allow-list and block internal addresses.",
+        ),
+        "HTTP request smuggling" => (
+            "A front-end and back-end server interpret request boundaries differently (Content-Length vs Transfer-Encoding), so part of one request can be treated as the start of the next, letting an attacker poison other users' requests.",
+            "Make the whole chain agree on request parsing: reject messages that carry both Content-Length and Transfer-Encoding, normalise framing at the front-end, and prefer HTTP/2 end to end.",
         ),
         _ => ("", ""),
     }
@@ -1006,6 +1029,7 @@ pub fn start(
         }
         for c in &ctxs {
             c.host_bchecks();
+            c.host_smuggle();
         }
         let total = work.len();
         let (next, work, shared) = (
