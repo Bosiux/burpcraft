@@ -47,7 +47,8 @@ into `<OUT>.png` with sample traffic (uses the BURPCRAFT_SHOT / BURPCRAFT_TAB de
 
 ## Not covered (larger efforts, decide before starting)
 - [ ] Native fallback render: no JavaScript (needs a JS engine + DOM; the Chromium engine covers it); flex has no wrap/align-items/order and auto items are sized from their text length; grid has no spans or row tracks; floats are side columns (text does not wrap under them); position:absolute/fixed stay in place in document order; a stylesheet `color` on `<a>` is overridden by the link blue
-- [ ] Scanner: no stored XSS, DOM checks only via DOM Invader, no XXE checks; request smuggling is timing-only (no obfuscated Transfer-Encoding variants, no H2 downgrade, no differential confirmation)
+- [ ] Scanner: DOM checks only via DOM Invader; request smuggling is timing-only (no obfuscated Transfer-Encoding variants, no H2 downgrade, no differential confirmation)
+- [ ] Scanner: stored-XSS re-fetch is bounded (per-injection and scan-wide caps) and only covers crawled GET pages, so input that surfaces in a POST-only view or beyond the cap is missed; XML insertion points are the first few element texts only (no attribute values)
 - [ ] BChecks: no nested `if`, no Collaborator built-ins (`generate_collaborator_address()`), one `run for each` variable, no request/response modification beyond payload and method/path
 - [ ] BurpCraft AI: a live answer was not exercised on the dev machine (no Anthropic API key there)
 - [ ] Project files are rewritten whole (autosave every 30 s, crash-safe), not incrementally like Burp's disk-based project: a crash loses up to 30 s of work; a temporary project (no file open) is not autosaved
@@ -77,7 +78,7 @@ Status: ✅ done · 🟡 partial · ❌ missing
 | Feature | What it does | BurpCraft |
 |---|---|---|
 | Passive scanner | Analyses proxied traffic without sending anything | ✅ (incl. insecure-deserialization signals: Java/PHP/Python-pickle serialized objects in requests/responses/cookies, ASP.NET ViewState without generator) |
-| Active scanner | Sends attack payloads to parameters: SQLi (error/boolean/time), reflected & stored XSS, path traversal, command injection, header injection, open redirect... | ✅ query/body/cookie/JSON/header points; SQLi error/boolean/time, reflected XSS, path traversal, SSTI, open redirect, header injection, command injection (time/OOB), SSRF (OOB), HTTP request smuggling (CL.TE/TE.CL timing, per host). No stored XSS yet |
+| Active scanner | Sends attack payloads to parameters: SQLi (error/boolean/time), reflected & stored XSS, path traversal, command injection, header injection, open redirect... | ✅ query/body/cookie/JSON/XML/header points; SQLi error/boolean/time, reflected & stored XSS, path traversal, SSTI, open redirect, header injection, command injection (time/OOB), SSRF (OOB), XXE (in-band file disclosure + OOB entity), HTTP request smuggling (CL.TE/TE.CL timing, per host) |
 | Crawler | Explores the site following links and forms, fills the site map | ✅ BFS, same origin, GET/POST forms, static files skipped |
 | Scan configurations | Fast/thorough profiles, chosen checks, rate limits | ✅ New scan dialog: Fast/Thorough, per-check toggles, pages, threads, delay |
 | Live tasks | Automatic audit (passive or active) of traffic as it passes the proxy | ✅ passive always; "New live task" = active audit of in-scope proxied requests |
