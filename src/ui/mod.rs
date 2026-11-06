@@ -3,3 +3,4 @@
 //! `App` struct, its init, the frame loop and command dispatch.
 
 mod dashboard;
+mod proxy;
