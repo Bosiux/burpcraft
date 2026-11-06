@@ -480,13 +480,17 @@ mod tests {
                 "missing {n} on {p}; found {found:?}"
             );
         }
-        // negative controls: escaped reflection and the login form are clean
+        // negative controls: escaped reflection and the login form have no active finding
+        // (passive header findings from the scanner's own traffic are expected there)
+        let active: Vec<&str> = expect.iter().map(|(_, n)| *n).collect();
         assert!(
-            !found
-                .iter()
-                .any(|(p, n)| (p == "/safe" || p == "/login") && *n != "Echoed marker"),
+            !found.iter().any(|(p, n)| (p == "/safe" || p == "/login")
+                && *n != "Echoed marker"
+                && active.contains(n)),
             "false positive: {found:?}"
         );
+        // scanner traffic is passively scanned too
+        assert!(found.contains(&("/search".into(), "No Content-Security-Policy")));
         // crawler stayed on the origin and skipped static files
         assert!(
             s.history
