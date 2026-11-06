@@ -4,7 +4,7 @@ A Rust (eframe/egui + wgpu) recreation of the observable features and look of Bu
 Built only from observable behaviour, no reverse engineering. Own name, no original logos/assets.
 
 Workspace: the app plus `server/` (`burpcraft-server`, self-hosted Collaborator + BApp Store, std only).
-Dev loop: `cargo test --workspace`, `python3 e2e.py` (local HTTP + WebSocket servers through the running proxy), then `OUT=/path/shot ./shot.sh <MainTab> [ProxyTab]` to render a screen
+Dev loop: `cargo test --workspace`, `python3 e2e.py` (local HTTP + WebSocket servers through the running proxy), `python3 e2e_scan.py --launch target/debug/burpcraft` (vulnerable local app with safe twins; scanner, OpenAPI, auth, passive, Intruder, Collaborator, send and intercept over REST/MCP; PASS/FAIL table), then `OUT=/path/shot ./shot.sh <MainTab> [ProxyTab]` to render a screen
 into `<OUT>.png` with sample traffic (uses the BURPCRAFT_SHOT / BURPCRAFT_TAB dev hooks).
 
 ## Done (iteration 1)
@@ -50,6 +50,10 @@ into `<OUT>.png` with sample traffic (uses the BURPCRAFT_SHOT / BURPCRAFT_TAB de
 - [ ] BChecks: subset of the original syntax (no loops, variables, `run for each`)
 - [ ] BurpCraft AI: a live answer was not exercised on the dev machine (no Anthropic API key there)
 - [ ] Project files are written on save/exit, not continuously like a disk-based project
+- [ ] Scanner: crawler/audit responses are not passively scanned (only proxied traffic is); header insertion points are only User-Agent and Referer
+- [ ] Scanner: Target scope is not applied (a scan stays on the origins it is given; the crawler is same-origin); delay/rate limit only in the New scan dialog, not over REST/MCP
+- [ ] REST API `/v0.1/scan`: no API definition, authentication, threads or delay fields (MCP `scan_start` has openapi/headers/login)
+- [ ] HTTP client buffers whole bodies in memory (no size cap on a real multi-GB response)
 
 ## Done (iteration 4): Pro features
 Everything in the table below is implemented; see the per-row notes. Self-hosting:
