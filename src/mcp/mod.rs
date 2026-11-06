@@ -8,7 +8,7 @@
 use crate::automation::openapi::{self, J};
 use crate::proxy::State;
 use crate::automation::rest::Tasks;
-use crate::target::Scope;
+use crate::tools::target::Scope;
 
 mod attack;
 mod handlers;

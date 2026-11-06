@@ -5,7 +5,7 @@ use eframe::egui::{self, RichText};
 use egui_extras::{Column, TableBuilder};
 
 use crate::proxy::Entry;
-use crate::{engage, ui::theme};
+use crate::{tools::engage, ui::theme};
 
 /// Shared HTTP history / Logger table with the original's columns and context menu.
 pub(crate) fn history_table(

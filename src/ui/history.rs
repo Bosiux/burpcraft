@@ -3,7 +3,7 @@
 
 use super::history_table::history_table;
 use crate::proxy::Entry;
-use crate::{App, proxy, target, ui::theme};
+use crate::{App, proxy, tools::target, ui::theme};
 use eframe::egui;
 
 impl App {

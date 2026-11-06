@@ -1,6 +1,5 @@
 // release builds are a GUI app on Windows: no console window
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
-mod engage;
 mod ext;
 mod http;
 mod intruder;
@@ -11,10 +10,7 @@ mod project;
 mod proxy;
 mod render;
 mod scan;
-mod search;
 mod security;
-mod sequencer;
-mod target;
 mod tools;
 mod ui;
 
@@ -27,6 +23,7 @@ use http::net;
 use project::update;
 use proxy::{Entry, State};
 use security::{collab, domi};
+use tools::{engage, search, sequencer, target};
 use ui::HistFilter;
 use ui::theme;
 #[cfg(target_os = "macos")]
