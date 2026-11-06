@@ -13,7 +13,7 @@ Stable tags are `vX.Y.Z` (marked latest), betas `vX.Y.Z-beta.N` (pre-release).
 
 ## Phases
 
-1. **Notify** (PR #8): GitHub Releases API at startup, banner with Release notes / Skip / Later, Settings toggle,
+1. **Notify** (PR #8): GitHub Releases API at startup, corner popup with Release notes / Skip / Later, Settings toggle,
    `BURPCRAFT_NO_UPDATE_CHECK`.
 2. **Signed manifest**: CI signs `SHA256SUMS.txt` with Ed25519 (`UPDATE_SIGNING_KEY` secret); the app embeds the
    public key and verifies with `ring`.
