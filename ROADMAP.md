@@ -4,7 +4,7 @@ A Rust (eframe/egui + wgpu) recreation of the observable features and look of Bu
 Built only from observable behaviour, no reverse engineering. Own name, no original logos/assets.
 
 Workspace: the app plus `server/` (`burpcraft-server`, self-hosted Collaborator + BApp Store, std only).
-Dev loop: `cargo test --workspace`, `python3 e2e.py` (local HTTP + WebSocket servers through the running proxy), then `OUT=/path/shot ./shot.sh <MainTab> [ProxyTab]` to render a screen
+Dev loop: `cargo test --workspace`, `python3 e2e.py` (local HTTP + WebSocket servers through the running proxy), `python3 e2e_scan.py --launch target/debug/burpcraft` (vulnerable local app with safe twins; scanner, OpenAPI, auth, passive, Intruder, Collaborator, send and intercept over REST/MCP; PASS/FAIL table), then `OUT=/path/shot ./shot.sh <MainTab> [ProxyTab]` to render a screen
 into `<OUT>.png` with sample traffic (uses the BURPCRAFT_SHOT / BURPCRAFT_TAB dev hooks).
 
 ## Done (iteration 1)
@@ -47,10 +47,14 @@ into `<OUT>.png` with sample traffic (uses the BURPCRAFT_SHOT / BURPCRAFT_TAB de
 
 ## Not covered (larger efforts, decide before starting)
 - [ ] Native fallback render: no JavaScript (needs a JS engine + DOM; the Chromium engine covers it); flex has no wrap/align-items/order and auto items are sized from their text length; grid has no spans or row tracks; floats are side columns (text does not wrap under them); position:absolute/fixed stay in place in document order; a stylesheet `color` on `<a>` is overridden by the link blue
-- [ ] Scanner: no stored XSS, DOM checks only via DOM Invader, no HTTP request smuggling / deserialization / XXE checks
-- [ ] API scanning: JSON definitions only (no YAML); BChecks: subset of the original syntax (no loops, variables, `run for each`)
+- [ ] Scanner: no stored XSS, DOM checks only via DOM Invader, no XXE checks; request smuggling is timing-only (no obfuscated Transfer-Encoding variants, no H2 downgrade, no differential confirmation)
+- [ ] BChecks: no nested `if`, no Collaborator built-ins (`generate_collaborator_address()`), one `run for each` variable, no request/response modification beyond payload and method/path
 - [ ] BurpCraft AI: a live answer was not exercised on the dev machine (no Anthropic API key there)
 - [ ] Project files are written on save/exit, not continuously like a disk-based project
+- [ ] Scanner: crawler/audit responses are not passively scanned (only proxied traffic is); header insertion points are only User-Agent and Referer
+- [ ] Scanner: Target scope is not applied (a scan stays on the origins it is given; the crawler is same-origin); delay/rate limit only in the New scan dialog, not over REST/MCP
+- [ ] REST API `/v0.1/scan`: no API definition, authentication, threads or delay fields (MCP `scan_start` has openapi/headers/login)
+- [ ] HTTP client buffers whole bodies in memory (no size cap on a real multi-GB response)
 
 ## Done (iteration 4): Pro features
 Everything in the table below is implemented; see the per-row notes. Self-hosting:
@@ -72,13 +76,13 @@ Status: ✅ done · 🟡 partial · ❌ missing
 ### Local only (no server)
 | Feature | What it does | BurpCraft |
 |---|---|---|
-| Passive scanner | Analyses proxied traffic without sending anything | ✅ |
-| Active scanner | Sends attack payloads to parameters: SQLi (error/boolean/time), reflected & stored XSS, path traversal, command injection, header injection, open redirect... | ✅ query/body/cookie/JSON/header points; SQLi error/boolean/time, reflected XSS, path traversal, SSTI, open redirect, header injection, command injection (time/OOB), SSRF (OOB). No stored XSS yet |
+| Passive scanner | Analyses proxied traffic without sending anything | ✅ (incl. insecure-deserialization signals: Java/PHP/Python-pickle serialized objects in requests/responses/cookies, ASP.NET ViewState without generator) |
+| Active scanner | Sends attack payloads to parameters: SQLi (error/boolean/time), reflected & stored XSS, path traversal, command injection, header injection, open redirect... | ✅ query/body/cookie/JSON/header points; SQLi error/boolean/time, reflected XSS, path traversal, SSTI, open redirect, header injection, command injection (time/OOB), SSRF (OOB), HTTP request smuggling (CL.TE/TE.CL timing, per host). No stored XSS yet |
 | Crawler | Explores the site following links and forms, fills the site map | ✅ BFS, same origin, GET/POST forms, static files skipped |
 | Scan configurations | Fast/thorough profiles, chosen checks, rate limits | ✅ New scan dialog: Fast/Thorough, per-check toggles, pages, threads, delay |
 | Live tasks | Automatic audit (passive or active) of traffic as it passes the proxy | ✅ passive always; "New live task" = active audit of in-scope proxied requests |
-| BChecks | Custom scan checks in a small declarative language | ✅ subset of the syntax: given response/host/insertion point, send payload/request, matches/in/is with and/or/not; editor in Extensions → BChecks |
-| API-definition scanning | Import OpenAPI/Swagger and scan the endpoints | ✅ OpenAPI 3 / Swagger 2 JSON (no YAML) |
+| BChecks | Custom scan checks in a small declarative language | ✅ subset of the syntax: given response/host/insertion point, send payload/request, matches/in/is with and/or/not, `define:` variables with `{name}` and `{random_str(n)}`, `run for each:` loops, if / else if / else; editor in Extensions → BChecks |
+| API-definition scanning | Import OpenAPI/Swagger and scan the endpoints | ✅ OpenAPI 3 / Swagger 2, JSON or YAML |
 | Authenticated scanning | Recorded login or credentials used during crawl/audit | ✅ extra headers + raw login request whose cookies join every request |
 | Reports | Export issues as HTML/XML | ✅ Dashboard "Report (HTML)" / "Export (XML)", with request/response evidence, in ~/.burpcraft/reports |
 | Project files | Save/reopen all state on disk: history, site map, Repeater, issues, settings | ✅ Project menu Open/Save/Save as, Ctrl+S, `burpcraft <file>`, saved on exit (gzip, own format) |

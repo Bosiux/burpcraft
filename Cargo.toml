@@ -23,6 +23,7 @@ scraper = "0.29.0"
 tokio = { version = "1", features = ["rt", "net", "time"] }
 webpki-roots = "1"
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12", "logging"] }
+yaml-rust2 = { version = "0.13", default-features = false }
 
 # eframe has no windowing backend on Linux without these
 [target.'cfg(target_os = "linux")'.dependencies]
