@@ -5,6 +5,21 @@ use egui_extras::{Column, TableBuilder};
 use crate::proxy::Entry;
 use crate::theme;
 
+/// Opens a file or URL with the OS default handler.
+pub fn open_external(target: impl AsRef<std::ffi::OsStr>) -> std::io::Result<()> {
+    let opener = if cfg!(target_os = "macos") {
+        "open"
+    } else if cfg!(windows) {
+        "explorer"
+    } else {
+        "xdg-open"
+    };
+    std::process::Command::new(opener)
+        .arg(target)
+        .spawn()
+        .map(|_| ())
+}
+
 const STATUSES: [&str; 3] = ["New", "In progress", "Done"];
 
 #[derive(Default)]
@@ -216,6 +231,8 @@ impl Settings {
                             .add(egui::Slider::new(&mut self.font_size, 10.0..=20.0).step_by(1.0))
                             .changed();
                     });
+                    ui.add_space(8.0);
+                    crate::update::settings(ui);
                     ui.add_space(8.0);
                     theme::heading(ui, "Hotkeys");
                     egui::Grid::new("hotkeys").striped(true).show(ui, |ui| {

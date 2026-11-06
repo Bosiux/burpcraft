@@ -20,13 +20,13 @@ impl J {
             _ => None,
         }
     }
-    fn str(&self) -> Option<&str> {
+    pub fn str(&self) -> Option<&str> {
         if let J::Str(s) = self { Some(s) } else { None }
     }
     fn entries(&self) -> &[(String, J)] {
         if let J::Obj(v) = self { v } else { &[] }
     }
-    fn items(&self) -> &[J] {
+    pub fn items(&self) -> &[J] {
         if let J::Arr(v) = self { v } else { &[] }
     }
     pub fn to_json(&self) -> String {
