@@ -690,11 +690,9 @@ fn audit_point(c: &Ctx, req: &str, p: &Point, base: &(Vec<u8>, Duration)) {
                 .cloned()
                 .collect();
             for path in pages {
-                if c.stored_left
-                    .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1))
-                    .is_err()
-                {
-                    break; // scan-wide re-fetch budget spent
+                if c.stored_left.fetch_sub(1, Ordering::SeqCst) == 0 {
+                    c.stored_left.fetch_add(1, Ordering::SeqCst); // undo; budget spent
+                    break;
                 }
                 let Some((resp2, _)) = c.send(&get_request(&c.target, &path)) else {
                     continue;
