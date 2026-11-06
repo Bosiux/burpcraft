@@ -7,7 +7,7 @@
 use std::io::{self, Read, Write};
 use std::time::{Duration, Instant};
 
-use crate::net;
+use crate::http::net;
 use crate::scan::Target;
 
 pub struct Finding {

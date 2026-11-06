@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicU16, Ordering};
 use std::sync::{Arc, mpsc};
 
 use super::*;
-use crate::net::{self, Ca, Stream};
+use crate::http::net::{self, Ca, Stream};
 
 static LISTEN_PORT: AtomicU16 = AtomicU16::new(0);
 
@@ -149,11 +149,11 @@ fn serve<S: Stream>(
             }
         };
         // DOM Invader reports from "Open browser" end here instead of going upstream
-        if host == crate::domi::REPORT_HOST {
-            let found = crate::domi::parse_findings(&String::from_utf8_lossy(
+        if host == crate::security::domi::REPORT_HOST {
+            let found = crate::security::domi::parse_findings(&String::from_utf8_lossy(
                 body(&msg).unwrap_or_default(),
             ));
-            crate::domi::record(&state, &found);
+            crate::security::domi::record(&state, &found);
             r.get_mut().write_all(b"HTTP/1.1 204 No Content\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: 0\r\n\r\n")?;
             continue;
         }
@@ -195,10 +195,11 @@ fn serve<S: Stream>(
                 Err(e) => error_page(&format!("Error connecting to {host}:{port}: {e}")),
             }
         } else {
-            let use_h2 =
-                tls && state.lock().unwrap().http2 && !crate::h2up::known_unsupported(&host, port);
+            let use_h2 = tls
+                && state.lock().unwrap().http2
+                && !crate::http::h2up::known_unsupported(&host, port);
             let h2_req = if use_h2 {
-                crate::h2up::to_h2_text(&req)
+                crate::http::h2up::to_h2_text(&req)
             } else {
                 None
             };
@@ -211,7 +212,7 @@ fn serve<S: Stream>(
                     // history shows the HTTP/2 exchange; the browser side stays HTTP/1.1
                     req = h2_req.unwrap();
                     h2_resp = Some(apply_rules(&rules, &r, false));
-                    crate::h2up::to_h1_response(h2_resp.as_ref().unwrap(), method == "HEAD")
+                    crate::http::h2up::to_h1_response(h2_resp.as_ref().unwrap(), method == "HEAD")
                 }
                 Err(e) if e.kind() != io::ErrorKind::Unsupported => {
                     error_page(&format!("Error connecting to {host}:{port}: {e}"))
@@ -270,8 +271,8 @@ fn serve<S: Stream>(
             highlight: None,
             tool: "Proxy",
         };
-        let mut found = crate::scanner::passive(&entry);
-        found.extend(crate::bcheck::passive(&entry));
+        let mut found = crate::security::scanner::passive(&entry);
+        found.extend(crate::security::bcheck::passive(&entry));
         crate::ext::on_response(&entry);
         if !found.is_empty() {
             let mut s = state.lock().unwrap();
@@ -386,7 +387,7 @@ fn hold(
 pub fn error_page(msg: &str) -> Vec<u8> {
     let body = format!(
         "<html><head><title>BurpCraft Error</title></head><body><h1>BurpCraft Error</h1><p>{}</p></body></html>",
-        crate::codec::html_encode(msg.as_bytes(), false)
+        crate::http::codec::html_encode(msg.as_bytes(), false)
     );
     format!(
         "HTTP/1.1 502 Bad Gateway\r\nContent-Type: text/html; charset=utf-8\r\nConnection: close\r\nContent-Length: {}\r\n\r\n{body}",

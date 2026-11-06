@@ -6,8 +6,8 @@ use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::{Arc, Mutex, OnceLock, mpsc};
 use std::time::Duration;
 
-use crate::codec::{base64_decode, base64_encode};
-use crate::openapi::{J, parse};
+use crate::automation::openapi::{J, parse};
+use crate::http::codec::{base64_decode, base64_encode};
 use crate::proxy::{Entry, State};
 
 pub struct Ext {
@@ -34,7 +34,7 @@ fn state_cell() -> &'static Mutex<Option<State>> {
 }
 
 fn list_file() -> std::path::PathBuf {
-    crate::net::data_dir().join("extensions.txt")
+    crate::http::net::data_dir().join("extensions.txt")
 }
 
 pub(super) fn save_list() {
@@ -44,7 +44,7 @@ pub(super) fn save_list() {
         .iter()
         .map(|e| e.lock().unwrap().path.clone())
         .collect();
-    let _ = std::fs::create_dir_all(crate::net::data_dir());
+    let _ = std::fs::create_dir_all(crate::http::net::data_dir());
     let _ = std::fs::write(list_file(), paths.join("\n"));
 }
 
@@ -133,7 +133,7 @@ fn report(j: &J, ext_name: &str) {
             )
         })
         .unwrap_or_default();
-    use crate::scanner::Severity;
+    use crate::security::scanner::Severity;
     let severity = match text(j, "severity").to_ascii_lowercase().as_str() {
         "high" => Severity::High,
         "medium" => Severity::Medium,
@@ -151,7 +151,7 @@ fn report(j: &J, ext_name: &str) {
         return;
     }
     let id = s.issues.len() + 1;
-    s.issues.push(crate::scanner::Issue {
+    s.issues.push(crate::security::scanner::Issue {
         id,
         name,
         severity,

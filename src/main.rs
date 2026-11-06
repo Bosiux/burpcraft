@@ -1,43 +1,33 @@
 // release builds are a GUI app on Windows: no console window
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
-mod ai;
-mod bcheck;
-mod codec;
-mod collab;
-mod domi;
-mod editor;
-mod engage;
+mod automation;
 mod ext;
-mod h2up;
+mod http;
 mod intruder;
-#[cfg(target_os = "macos")]
-mod macmenu;
 mod mcp;
 mod misc;
-mod net;
-mod openapi;
 mod project;
 mod proxy;
 mod render;
-mod report;
-mod rest;
 mod scan;
-mod scanner;
-mod search;
-mod sequencer;
-mod smuggle;
-mod target;
-mod theme;
+mod security;
 mod tools;
 mod ui;
-mod update;
 
 use std::sync::Arc;
 
 use eframe::egui::{self, RichText};
 
+use automation::rest;
+use http::net;
+use project::update;
 use proxy::{Entry, State};
+use security::{collab, domi};
+use tools::{engage, search, sequencer, target};
 use ui::HistFilter;
+#[cfg(target_os = "macos")]
+use ui::macmenu;
+use ui::theme;
 
 const MAIN_TABS: [&str; 13] = [
     "Dashboard",
@@ -107,7 +97,7 @@ struct App {
     project: Option<std::path::PathBuf>,
     /// Project dialog: (saving?, typed path, status message).
     project_dlg: Option<(bool, String, String)>,
-    autosave: project::Autosave,
+    autosave: project::project::Autosave,
     search: search::Search,
     engage: engage::Engage,
     collab: collab::Tab,
@@ -193,7 +183,7 @@ impl App {
         }
         // `burpcraft <file.burpcraft>` opens a project
         if let Some(path) = std::env::args_os().nth(1).map(std::path::PathBuf::from) {
-            match project::open(&mut app, &path) {
+            match project::project::open(&mut app, &path) {
                 Ok(()) => app.project = Some(path),
                 // a new path starts a new project there, autosaved and saved on exit
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => app.project = Some(path),
@@ -355,7 +345,7 @@ impl App {
     }
 
     fn save_project(&mut self, path: std::path::PathBuf) -> Result<(), String> {
-        project::save(self, &path)
+        project::project::save(self, &path)
             .map_err(|e| format!("Failed to save {}: {e}", path.display()))?;
         self.state
             .lock()
@@ -391,7 +381,7 @@ impl App {
                     let result = if saving {
                         self.save_project(p)
                     } else {
-                        project::open(self, &p)
+                        project::project::open(self, &p)
                             .map(|()| self.project = Some(p))
                             .map_err(|e| format!("Failed to open: {e}"))
                     };
@@ -421,7 +411,7 @@ impl App {
         let current = || {
             self.project
                 .clone()
-                .unwrap_or_else(project::default_path)
+                .unwrap_or_else(project::project::default_path)
                 .display()
                 .to_string()
         };
@@ -544,7 +534,7 @@ impl App {
                     )
                     .on_hover_text(format!(
                         "Autosaved every {} s to {}",
-                        project::AUTOSAVE.as_secs(),
+                        project::project::AUTOSAVE.as_secs(),
                         p.display()
                     ));
                 }
@@ -723,7 +713,7 @@ impl eframe::App for App {
     fn on_exit(&mut self) {
         // like a disk-based project: closing the app keeps the work
         if let Some(p) = self.project.clone() {
-            let _ = project::save(self, &p);
+            let _ = project::project::save(self, &p);
         }
     }
 
@@ -787,7 +777,7 @@ impl eframe::App for App {
             self.entry_action(what, e, false);
         }
         self.run_schedules(ui.ctx());
-        project::autosave(self, ui.ctx());
+        project::project::autosave(self, ui.ctx());
         if ui.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::S)) {
             self.run(ui.ctx(), Cmd::SaveProject);
         }

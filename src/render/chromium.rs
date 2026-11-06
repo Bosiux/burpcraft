@@ -59,7 +59,7 @@ pub fn page_with_base(html: &str, base: Option<&str>) -> String {
     match base {
         Some(b) => format!(
             "<base href=\"{}\">{html}",
-            crate::codec::html_encode(b.as_bytes(), false)
+            crate::http::codec::html_encode(b.as_bytes(), false)
         ),
         None => html.to_string(),
     }
@@ -262,7 +262,7 @@ pub fn open_in_browser(html: &str, base: Option<&str>) -> std::io::Result<()> {
     if let Some(b) = base {
         page += &format!(
             "<base href=\"{}\">",
-            crate::codec::html_encode(b.as_bytes(), false)
+            crate::http::codec::html_encode(b.as_bytes(), false)
         );
     }
     page += html;

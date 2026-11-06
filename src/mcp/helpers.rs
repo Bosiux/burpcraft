@@ -1,8 +1,8 @@
 //! Shared helpers for the tool handlers: JSON builders, argument extractors, and
 //! message formatting (decoded display text, raw CRLF conversion, target/source).
-use crate::openapi::J;
+use crate::automation::openapi::J;
 use crate::proxy::{self, Entry};
-use crate::{net, scan, tools};
+use crate::{http::net, scan, tools};
 
 pub(crate) fn obj(v: Vec<(&str, J)>) -> J {
     J::Obj(v.into_iter().map(|(k, v)| (k.to_string(), v)).collect())

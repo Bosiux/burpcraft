@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 
 use eframe::egui::{self, RichText};
 
-use crate::{editor, net, proxy, theme};
+use crate::{http::net, proxy, ui::editor, ui::theme};
 
 pub struct Sequencer {
     tab: &'static str,

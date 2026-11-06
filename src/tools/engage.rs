@@ -150,14 +150,14 @@ pub fn analyze(history: &[Entry], e: &Entry) -> String {
 }
 
 fn attr(s: &str) -> String {
-    crate::codec::html_encode(s.as_bytes(), false)
+    crate::http::codec::html_encode(s.as_bytes(), false)
 }
 
 /// Auto-submitting HTML form that replays the request cross-site.
 pub fn csrf_poc(e: &Entry) -> String {
     let req = String::from_utf8_lossy(&e.req);
     let head = String::from_utf8_lossy(proxy::head(&e.req)).into_owned();
-    let ct = crate::net::header(&head, "content-type")
+    let ct = crate::http::net::header(&head, "content-type")
         .unwrap_or_default()
         .to_ascii_lowercase();
     let body = req
@@ -169,7 +169,8 @@ pub fn csrf_poc(e: &Entry) -> String {
     let action = format!("{}{}", e.origin(), if get { path } else { &e.url });
     let field = |k: &str, v: &str| {
         let d = |s: &str| {
-            String::from_utf8_lossy(&crate::codec::url_decode(&s.replace('+', " "))).into_owned()
+            String::from_utf8_lossy(&crate::http::codec::url_decode(&s.replace('+', " ")))
+                .into_owned()
         };
         format!(
             "      <input type=\"hidden\" name=\"{}\" value=\"{}\" />\n",
@@ -294,7 +295,7 @@ fn get(e: &Entry, path: &str) -> Option<(u16, Vec<u8>, Vec<u8>, Vec<u8>)> {
         format!("{}:{}", e.host, e.port)
     };
     let req = format!("GET {path} HTTP/1.1\r\nHost: {host}\r\nUser-Agent: Mozilla/5.0 BurpCraft\r\nAccept: */*\r\nConnection: close\r\n\r\n").into_bytes();
-    let resp = crate::net::send(&e.host, e.port, e.tls, &req).ok()?;
+    let resp = crate::http::net::send(&e.host, e.port, e.tls, &req).ok()?;
     let status = String::from_utf8_lossy(proxy::head(&resp))
         .split_whitespace()
         .nth(1)
@@ -427,7 +428,7 @@ impl Engage {
             return;
         }
         let mut open = true;
-        crate::theme::window(ctx, "Engagement tools", [820.0, 520.0], &mut open, |ui| {
+        crate::ui::theme::window(ctx, "Engagement tools", [820.0, 520.0], &mut open, |ui| {
             ui.strong(&self.title);
             ui.separator();
             if let Some(d) = &self.discovery {

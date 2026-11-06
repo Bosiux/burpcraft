@@ -32,7 +32,7 @@
 //! branch without one reports nothing; a plain `if` always reports).
 use std::sync::{Mutex, OnceLock};
 
-use crate::scanner::Severity;
+use crate::security::scanner::Severity;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Given {
@@ -436,8 +436,13 @@ impl BCheck {
         })
     }
     /// Issue for a match (name/description leaked once per load: issues hold `&'static str`).
-    pub fn issue(&self, origin: String, path: String, entry_id: usize) -> crate::scanner::Issue {
-        crate::scanner::Issue {
+    pub fn issue(
+        &self,
+        origin: String,
+        path: String,
+        entry_id: usize,
+    ) -> crate::security::scanner::Issue {
+        crate::security::scanner::Issue {
             id: 0,
             name: Box::leak(self.name.clone().into_boxed_str()),
             severity: self.severity,
@@ -457,7 +462,7 @@ impl BCheck {
 }
 
 pub fn dir() -> std::path::PathBuf {
-    crate::net::data_dir().join("bchecks")
+    crate::http::net::data_dir().join("bchecks")
 }
 
 /// Loaded checks (from ~/.burpcraft/bchecks/*.bcheck) with any parse errors.
@@ -504,7 +509,7 @@ pub fn enabled(given: impl Fn(&Given) -> bool) -> Vec<BCheck> {
 }
 
 /// Passive `given response` checks for one proxied item.
-pub fn passive(e: &crate::proxy::Entry) -> Vec<crate::scanner::Issue> {
+pub fn passive(e: &crate::proxy::Entry) -> Vec<crate::security::scanner::Issue> {
     enabled(|g| *g == Given::Response)
         .iter()
         .filter_map(|b| {

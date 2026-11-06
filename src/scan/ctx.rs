@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use crate::proxy::{self, Entry, State};
-use crate::scanner::{Issue, Severity};
+use crate::security::scanner::{Issue, Severity};
 
 // ------------------------------------------------------------ task
 
@@ -126,7 +126,7 @@ impl Ctx {
             std::thread::sleep(Duration::from_millis(self.cfg.delay_ms));
         }
         let t0 = Instant::now();
-        let resp = crate::net::send(
+        let resp = crate::http::net::send(
             &self.target.host,
             self.target.port,
             self.target.tls,
@@ -198,13 +198,13 @@ impl Ctx {
 
     /// BChecks: `given host` once per target.
     pub(crate) fn host_bchecks(&self) {
-        for b in crate::bcheck::enabled(|g| *g == crate::bcheck::Given::Host) {
-            let crate::bcheck::Action::Request { method, path } = &b.action else {
+        for b in crate::security::bcheck::enabled(|g| *g == crate::security::bcheck::Given::Host) {
+            let crate::security::bcheck::Action::Request { method, path } = &b.action else {
                 continue;
             };
             let req = get_request(&self.target, path).replacen("GET ", &format!("{method} "), 1);
             if let Some((resp, _)) = self.send(&req)
-                && let Some(m) = b.matched(&crate::bcheck::Responses {
+                && let Some(m) = b.matched(&crate::security::bcheck::Responses {
                     latest: &resp,
                     base: None,
                 })
@@ -220,7 +220,7 @@ impl Ctx {
         if self.stop.load(Ordering::SeqCst) || !self.cfg.on("HTTP request smuggling (timing)") {
             return;
         }
-        if let Some(f) = crate::smuggle::detect(&self.target, Duration::from_secs(10)) {
+        if let Some(f) = crate::security::smuggle::detect(&self.target, Duration::from_secs(10)) {
             self.report(
                 "HTTP request smuggling",
                 Severity::High,

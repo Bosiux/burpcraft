@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use crate::proxy::{self, State};
-use crate::scanner::Severity;
+use crate::security::scanner::Severity;
 
 mod checks;
 mod config;
@@ -197,9 +197,9 @@ pub fn start(
             *status.lock().unwrap() = "Waiting for out-of-band interactions".into();
             for _ in 0..3 {
                 std::thread::sleep(Duration::from_secs(2));
-                let _ = crate::collab::poll();
+                let _ = crate::security::collab::poll();
             }
-            let hits = crate::collab::interactions_for(&format!("Scan {id} "));
+            let hits = crate::security::collab::interactions_for(&format!("Scan {id} "));
             for (c, (label, issue, detail, req)) in pending {
                 if let Some((it, _)) = hits.iter().find(|(_, l)| *l == label) {
                     c.report(
@@ -328,7 +328,7 @@ mod tests {
                         all.split('&')
                             .find_map(|kv| kv.strip_prefix(&format!("{k}=")))
                             .map(|v| {
-                                String::from_utf8_lossy(&crate::codec::url_decode(
+                                String::from_utf8_lossy(&crate::http::codec::url_decode(
                                     &v.replace('+', " "),
                                 ))
                                 .into_owned()
@@ -340,7 +340,7 @@ mod tests {
                     let (status, headers, body) = match path {
                         "/" => html("<a href=\"/search?q=hi\">s</a> <a href='/item?id=1'>i</a> <a href=\"/file?name=a.txt\">f</a> <a href=\"/go?url=/home\">g</a> <a href=\"/tpl?name=x\">t</a> <a href=\"/fetch?u=http://x/\">fetch</a> <a href=\"/safe?q=1\">safe</a> <a href=\"/comment?c=hi\">add</a> <a href=\"/comments\">list</a> <img src=\"/logo.png\"> <a href=\"https://other.example/\">ext</a> <form method=post action=/login><input name=user><input type=password name=pass></form>".into()),
                         "/search" => html(format!("Results for {}", arg("q"))),
-                        "/safe" => html(format!("Results for {}", crate::codec::html_encode(arg("q").as_bytes(), false))),
+                        "/safe" => html(format!("Results for {}", crate::http::codec::html_encode(arg("q").as_bytes(), false))),
                         "/item" => {
                             let id = arg("id");
                             if id.contains('\'') {
@@ -387,7 +387,7 @@ mod tests {
                             })
                         }
                         "/.git/HEAD" => ("200 OK", vec![], "ref: refs/heads/main\n".into()),
-                        "/login" => html(format!("Welcome {}", crate::codec::html_encode(arg("user").as_bytes(), false))),
+                        "/login" => html(format!("Welcome {}", crate::http::codec::html_encode(arg("user").as_bytes(), false))),
                         _ => ("404 Not Found", vec![], "nope".into()),
                     };
                     let mut c = c;
@@ -408,12 +408,12 @@ mod tests {
 
     #[test]
     fn crawls_and_finds_each_issue_class() {
-        let _g = crate::collab::TEST_LOCK
+        let _g = crate::security::collab::TEST_LOCK
             .lock()
             .unwrap_or_else(|e| e.into_inner());
         let collab = burpcraft_server::start(burpcraft_server::Config::default()).unwrap();
         {
-            let mut c = crate::collab::client().lock().unwrap();
+            let mut c = crate::security::collab::client().lock().unwrap();
             (c.server, c.domain, c.secret) = (
                 format!("127.0.0.1:{}", collab.http_port),
                 String::new(),
@@ -422,9 +422,9 @@ mod tests {
         }
         let port = vulnerable_app();
         {
-            let mut b = crate::bcheck::checks().lock().unwrap();
-            b.0.push(crate::bcheck::parse(crate::bcheck::TEMPLATE).unwrap());
-            b.0.push(crate::bcheck::parse("metadata:\n name: \"Echoed marker\"\ngiven query insertion point then\n send payload:\n  replacing: \"bcmark42\"\n if \"bcmark42\" in {latest.response.body} then\n  report issue:\n   severity: info\n end if").unwrap());
+            let mut b = crate::security::bcheck::checks().lock().unwrap();
+            b.0.push(crate::security::bcheck::parse(crate::security::bcheck::TEMPLATE).unwrap());
+            b.0.push(crate::security::bcheck::parse("metadata:\n name: \"Echoed marker\"\ngiven query insertion point then\n send payload:\n  replacing: \"bcmark42\"\n if \"bcmark42\" in {latest.response.body} then\n  report issue:\n   severity: info\n end if").unwrap());
         }
         let state = proxy::Shared::new();
         let xml_body = "<?xml version=\"1.0\"?><data><name>test</name></data>";

@@ -45,3 +45,8 @@ mod tests {
         assert!(r.iter().any(|(t, s)| *t == Tag::Modified && s == "x"));
     }
 }
+
+pub mod engage;
+pub mod search;
+pub mod sequencer;
+pub mod target;

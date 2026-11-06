@@ -6,7 +6,7 @@
 //! `--dump-dom`), and as a POST to a reserved host that the BurpCraft proxy turns into issues while
 //! you browse with "Open browser".
 use crate::proxy::State;
-use crate::scanner::{Issue, Severity};
+use crate::security::scanner::{Issue, Severity};
 
 pub const REPORT_HOST: &str = "burpcraft-dom-invader.invalid";
 pub const CANARY: &str = "bcdi7q3x";
@@ -73,7 +73,7 @@ const SCRIPT: &str = r#"(() => {
 
 /// Writes the extension (fresh each time, so updates apply) and returns its directory.
 pub fn extension_dir() -> std::io::Result<std::path::PathBuf> {
-    let dir = crate::net::data_dir().join("dom-invader");
+    let dir = crate::http::net::data_dir().join("dom-invader");
     std::fs::create_dir_all(&dir)?;
     std::fs::write(dir.join("manifest.json"), MANIFEST)?;
     std::fs::write(
@@ -97,17 +97,17 @@ pub struct Finding {
 pub fn parse_findings(text: &str) -> Vec<Finding> {
     let json = if let Some(i) = text.find("data-bcdi=\"") {
         let rest = &text[i + 11..];
-        crate::codec::html_decode(&rest[..rest.find('"').unwrap_or(0)])
+        crate::http::codec::html_decode(&rest[..rest.find('"').unwrap_or(0)])
     } else {
         text.to_string()
     };
-    let field = |j: &crate::openapi::J, k: &str| match j.get(k) {
-        Some(crate::openapi::J::Str(s)) => s.clone(),
+    let field = |j: &crate::automation::openapi::J, k: &str| match j.get(k) {
+        Some(crate::automation::openapi::J::Str(s)) => s.clone(),
         _ => String::new(),
     };
-    let items = match crate::openapi::parse(json.trim()) {
-        Ok(crate::openapi::J::Arr(v)) => v,
-        Ok(o @ crate::openapi::J::Obj(_)) => vec![o],
+    let items = match crate::automation::openapi::parse(json.trim()) {
+        Ok(crate::automation::openapi::J::Arr(v)) => v,
+        Ok(o @ crate::automation::openapi::J::Obj(_)) => vec![o],
         _ => vec![],
     };
     items

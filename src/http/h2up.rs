@@ -158,7 +158,7 @@ pub fn send(host: &str, port: u16, req: &[u8]) -> io::Result<Vec<u8>> {
 async fn exchange(host: &str, port: u16, p: Parsed) -> io::Result<Vec<u8>> {
     let tcp = tokio::net::TcpStream::connect((host, port)).await?;
     tcp.set_nodelay(true).ok();
-    let mut cfg = (*crate::net::client_config()).clone();
+    let mut cfg = (*crate::http::net::client_config()).clone();
     cfg.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
     let name = rustls::pki_types::ServerName::try_from(host.to_string()).map_err(io_err)?;
     let tls = tokio_rustls::TlsConnector::from(Arc::new(cfg))
@@ -222,7 +222,7 @@ mod tests {
 
     /// Local TLS server signed by our CA; speaks h2 when `h2` is true, else only advertises http/1.1.
     fn local_server(h2: bool) -> u16 {
-        let ca = crate::net::Ca::load_or_create().unwrap();
+        let ca = crate::http::net::Ca::load_or_create().unwrap();
         let mut cfg = (*ca.server_config("localhost").unwrap()).clone();
         cfg.alpn_protocols = vec![if h2 {
             b"h2".to_vec()

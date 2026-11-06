@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 
-use crate::openapi::J;
+use crate::automation::openapi::J;
 
 pub const MODEL: &str = "claude-opus-5-5";
 /// Evidence above this size is cut, and the prompt says so (never silently).
@@ -42,7 +42,7 @@ fn evidence(label: &str, msg: &[u8]) -> String {
 }
 
 /// Messages API request body (non-streaming; refusals fall back server-side to another model).
-pub fn request_body(issue: &crate::scanner::Issue, req: &[u8], resp: &[u8]) -> String {
+pub fn request_body(issue: &crate::security::scanner::Issue, req: &[u8], resp: &[u8]) -> String {
     let user = format!(
         "Finding: {}\nSeverity: {} / confidence: {}\nLocation: {}{}\nScanner detail: {}\n\n{}\n\n{}",
         issue.name,
@@ -78,7 +78,7 @@ pub fn request_body(issue: &crate::scanner::Issue, req: &[u8], resp: &[u8]) -> S
 
 /// Text of a Messages API response body, or a readable error (API error, refusal, truncation).
 pub fn parse_response(status: u16, body: &str) -> Result<String, String> {
-    let j = crate::openapi::parse(body)
+    let j = crate::automation::openapi::parse(body)
         .map_err(|e| format!("unreadable API response ({status}): {e}"))?;
     let s = |j: Option<&J>| {
         if let Some(J::Str(v)) = j {
@@ -128,7 +128,7 @@ fn call(body: &str, api_key: &str) -> Result<String, String> {
         "POST /v1/messages HTTP/1.1\r\nHost: api.anthropic.com\r\nContent-Type: application/json\r\nx-api-key: {api_key}\r\nanthropic-version: 2023-06-01\r\nanthropic-beta: server-side-fallback-2026-07-01\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
         body.len()
     );
-    let resp = crate::net::send_verified("api.anthropic.com", req.as_bytes())
+    let resp = crate::http::net::send_verified("api.anthropic.com", req.as_bytes())
         .map_err(|e| format!("Could not reach the Anthropic API: {e}"))?;
     let status = String::from_utf8_lossy(crate::proxy::head(&resp))
         .split_whitespace()
@@ -143,7 +143,7 @@ fn call(body: &str, api_key: &str) -> Result<String, String> {
 
 /// Starts an explanation in the background; the result appears in `answers()`.
 pub fn explain(
-    issue: crate::scanner::Issue,
+    issue: crate::security::scanner::Issue,
     req: Vec<u8>,
     resp: Vec<u8>,
     ctx: eframe::egui::Context,
@@ -170,7 +170,7 @@ pub fn explain(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::scanner::{Issue, Severity};
+    use crate::security::scanner::{Issue, Severity};
 
     #[test]
     fn request_and_response_shapes() {
@@ -187,7 +187,7 @@ mod tests {
             entry_id: 1,
         };
         let big = vec![b'x'; MAX_EVIDENCE + 10];
-        let body = crate::openapi::parse(&request_body(
+        let body = crate::automation::openapi::parse(&request_body(
             &issue,
             b"GET /item?id=1' HTTP/1.1\r\n\r\n",
             &big,

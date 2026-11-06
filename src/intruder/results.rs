@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 use eframe::egui::{self, RichText};
 use egui_extras::{Column, TableBuilder};
 
-use crate::theme;
+use crate::ui::theme;
 
 use super::*;
 
@@ -50,7 +50,7 @@ impl Grep {
         if self.payloads {
             // payloads are sent URL-encoded; look for the decoded value
             let hit = payloads.iter().any(|p| {
-                let raw = String::from_utf8_lossy(&crate::codec::url_decode(p)).into_owned();
+                let raw = String::from_utf8_lossy(&crate::http::codec::url_decode(p)).into_owned();
                 !raw.is_empty() && resp.contains(&raw)
             });
             out.push(if hit { "Yes".into() } else { String::new() });
@@ -217,7 +217,7 @@ impl Intruder {
                 });
                     drop(rows);
                     let (mut req, mut resp) = (req, resp);
-                    crate::editor::split(ui, ("ares_req", k), &mut req, false, &mut resp, None);
+                    crate::ui::editor::split(ui, ("ares_req", k), &mut req, false, &mut resp, None);
                 },
             );
             if !open {

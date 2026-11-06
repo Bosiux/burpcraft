@@ -3,7 +3,7 @@ use eframe::egui::{self, RichText};
 
 use super::runtime::{load, registry, save_list, start, unload};
 use super::store::{BApp, install, store_list};
-use crate::theme;
+use crate::ui::theme;
 
 // ------------------------------------------------------------ UI
 
@@ -134,7 +134,11 @@ impl Tab {
 
     fn store(&mut self, ui: &mut egui::Ui) {
         if self.store_server.is_empty() {
-            self.store_server = crate::collab::client().lock().unwrap().server.clone();
+            self.store_server = crate::security::collab::client()
+                .lock()
+                .unwrap()
+                .server
+                .clone();
         }
         ui.label("BApps are served by a self-hosted burpcraft-server started with --bapps <dir>.");
         ui.horizontal(|ui| {
@@ -191,17 +195,18 @@ impl Tab {
     }
 
     fn bchecks(&mut self, ui: &mut egui::Ui) {
-        ui.label(format!("BChecks in {} (*.bcheck). Enabled checks run in active scans and on proxied responses.", crate::bcheck::dir().display()));
+        ui.label(format!("BChecks in {} (*.bcheck). Enabled checks run in active scans and on proxied responses.", crate::security::bcheck::dir().display()));
         ui.horizontal(|ui| {
             if ui.button("New").clicked() {
-                (self.bcheck_sel, self.bcheck_text) = (None, crate::bcheck::TEMPLATE.to_string());
+                (self.bcheck_sel, self.bcheck_text) =
+                    (None, crate::security::bcheck::TEMPLATE.to_string());
             }
             if ui.button("Reload from disk").clicked() {
-                *crate::bcheck::checks().lock().unwrap() =
-                    crate::bcheck::load_dir(&crate::bcheck::dir());
+                *crate::security::bcheck::checks().lock().unwrap() =
+                    crate::security::bcheck::load_dir(&crate::security::bcheck::dir());
             }
         });
-        let (list, errs) = crate::bcheck::checks().lock().unwrap().clone();
+        let (list, errs) = crate::security::bcheck::checks().lock().unwrap().clone();
         for e in &errs {
             ui.colored_label(egui::Color32::from_rgb(0xC0, 0x30, 0x30), e);
         }
@@ -216,7 +221,7 @@ impl Tab {
                 for (i, b) in list.iter().enumerate() {
                     let mut on = b.enabled;
                     if ui.checkbox(&mut on, "").changed() {
-                        crate::bcheck::checks().lock().unwrap().0[i].enabled = on;
+                        crate::security::bcheck::checks().lock().unwrap().0[i].enabled = on;
                     }
                     if ui
                         .selectable_label(self.bcheck_sel == Some(i), &b.name)
@@ -231,13 +236,13 @@ impl Tab {
         ui.separator();
         ui.horizontal(|ui| {
             if ui.button("Validate").clicked() {
-                self.bcheck_msg = match crate::bcheck::parse(&self.bcheck_text) {
+                self.bcheck_msg = match crate::security::bcheck::parse(&self.bcheck_text) {
                     Ok(b) => format!("OK: \"{}\"", b.name),
                     Err(e) => e,
                 };
             }
             if ui.button("Save").clicked() {
-                self.bcheck_msg = match crate::bcheck::parse(&self.bcheck_text) {
+                self.bcheck_msg = match crate::security::bcheck::parse(&self.bcheck_text) {
                     Ok(b) => {
                         let file: String = b
                             .name
@@ -250,12 +255,14 @@ impl Tab {
                                 }
                             })
                             .collect();
-                        let path = crate::bcheck::dir().join(format!("{file}.bcheck"));
-                        let _ = std::fs::create_dir_all(crate::bcheck::dir());
+                        let path = crate::security::bcheck::dir().join(format!("{file}.bcheck"));
+                        let _ = std::fs::create_dir_all(crate::security::bcheck::dir());
                         match std::fs::write(&path, &self.bcheck_text) {
                             Ok(()) => {
-                                *crate::bcheck::checks().lock().unwrap() =
-                                    crate::bcheck::load_dir(&crate::bcheck::dir());
+                                *crate::security::bcheck::checks().lock().unwrap() =
+                                    crate::security::bcheck::load_dir(
+                                        &crate::security::bcheck::dir(),
+                                    );
                                 format!("Saved {}", path.display())
                             }
                             Err(e) => format!("Save failed: {e}"),

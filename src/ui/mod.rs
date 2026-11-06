@@ -9,3 +9,8 @@ mod proxy;
 
 pub(crate) use history::HistFilter;
 pub(crate) use history_table::history_table;
+
+pub mod editor;
+#[cfg(target_os = "macos")]
+pub mod macmenu;
+pub mod theme;

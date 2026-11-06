@@ -3,7 +3,7 @@ use std::time::Instant;
 
 use eframe::egui::{self, RichText};
 
-use crate::{editor, net, proxy, theme};
+use crate::{http::net, proxy, ui::editor, ui::theme};
 
 pub struct RepeaterTab {
     pub name: String,
@@ -236,7 +236,7 @@ impl Repeater {
             t.target(),
             t.req.split_whitespace().nth(1).unwrap_or("/")
         );
-        crate::editor::split(
+        crate::ui::editor::split(
             ui,
             ("rep_req", t.name.as_str()),
             &mut t.req,
@@ -266,7 +266,7 @@ fn send(t: &mut RepeaterTab, ctx: egui::Context) {
 /// Rewrites the request line version (and converts headers) when toggling HTTP/1 <-> HTTP/2.
 pub fn set_protocol(req: &str, h2: bool) -> String {
     if h2 {
-        return crate::h2up::to_h2_text(req.as_bytes())
+        return crate::http::h2up::to_h2_text(req.as_bytes())
             .map(|b| String::from_utf8_lossy(&b).into_owned())
             .unwrap_or_else(|| req.into());
     }

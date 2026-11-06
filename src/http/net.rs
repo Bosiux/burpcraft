@@ -244,7 +244,7 @@ pub fn send(host: &str, port: u16, tls: bool, req: &[u8]) -> io::Result<Vec<u8>>
                 "HTTP/2 requires HTTPS (h2c is not supported)",
             ));
         }
-        return crate::h2up::send(host, port, req);
+        return crate::http::h2up::send(host, port, req);
     }
     let mut s = connect(host, port, tls)?;
     s.write_all(req)?;
@@ -355,7 +355,7 @@ impl Ca {
 
 pub fn pem_to_der(pem: &str) -> Option<Vec<u8>> {
     let b64: String = pem.lines().filter(|l| !l.starts_with("-----")).collect();
-    crate::codec::base64_decode(&b64)
+    crate::http::codec::base64_decode(&b64)
 }
 
 #[cfg(test)]

@@ -4,7 +4,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::Ordering;
 
-use crate::openapi::{self, J};
+use crate::automation::openapi::{self, J};
 use crate::proxy;
 
 use super::attack::anomalies;

@@ -1,7 +1,7 @@
 //! Raw HTTP message framing and body decoding helpers.
 use std::sync::Mutex;
 
-use crate::net;
+use crate::http::net;
 
 pub fn mime_label(content_type: &str, resp: &[u8]) -> String {
     let ct = content_type.to_ascii_lowercase();

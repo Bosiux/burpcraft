@@ -18,7 +18,7 @@ pub struct Shared {
     pub history: Vec<Entry>,
     pub logger: Vec<Entry>,
     pub ws: Vec<WsMsg>,
-    pub issues: Vec<crate::scanner::Issue>,
+    pub issues: Vec<crate::security::scanner::Issue>,
     pub intercept: bool,
     pub intercept_responses: bool,
     /// Intercept rules: skip URLs whose file extension matches this regex; only hosts containing `intercept_host`.

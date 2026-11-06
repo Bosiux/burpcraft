@@ -1,7 +1,7 @@
 //! Issue reports: a standalone HTML page (summary by severity, then each issue with its evidence) and an XML export.
-use crate::codec::html_encode;
+use crate::http::codec::html_encode;
 use crate::proxy::Entry;
-use crate::scanner::{Issue, Severity};
+use crate::security::scanner::{Issue, Severity};
 
 fn esc(s: &str) -> String {
     html_encode(s.as_bytes(), false)
@@ -101,7 +101,7 @@ fn xml_esc(s: &str) -> String {
 }
 
 pub fn xml(issues: &[Issue], history: &[Entry]) -> String {
-    use crate::codec::base64_encode as encode;
+    use crate::http::codec::base64_encode as encode;
     let mut out = format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<issues burpcraftVersion=\"{}\" exportTime=\"{}\">\n",
         env!("CARGO_PKG_VERSION"),
@@ -139,7 +139,7 @@ pub fn write(
     history: &[Entry],
     as_html: bool,
 ) -> std::io::Result<std::path::PathBuf> {
-    let dir = crate::net::data_dir().join("reports");
+    let dir = crate::http::net::data_dir().join("reports");
     std::fs::create_dir_all(&dir)?;
     let stamp = chrono::Local::now().format("%Y%m%d-%H%M%S");
     let path = dir.join(format!(

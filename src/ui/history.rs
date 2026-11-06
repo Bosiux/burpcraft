@@ -3,7 +3,7 @@
 
 use super::history_table::history_table;
 use crate::proxy::Entry;
-use crate::{App, proxy, target, theme};
+use crate::{App, proxy, tools::target, ui::theme};
 use eframe::egui;
 
 impl App {
@@ -60,7 +60,7 @@ impl App {
         if let Some(e) = sel {
             let mut req = String::from_utf8_lossy(&e.req).into_owned();
             let mut resp = proxy::display(&e.resp);
-            crate::editor::split(
+            crate::ui::editor::split(
                 ui,
                 ("hreq", e.id),
                 &mut req,
@@ -107,7 +107,7 @@ impl App {
         if let Some(e) = sel {
             let mut req = String::from_utf8_lossy(&e.req).into_owned();
             let mut resp = proxy::display(&e.resp);
-            crate::editor::split(
+            crate::ui::editor::split(
                 ui,
                 ("lreq", e.id),
                 &mut req,
