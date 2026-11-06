@@ -46,7 +46,7 @@ into `<OUT>.png` with sample traffic (uses the BURPCRAFT_SHOT / BURPCRAFT_TAB de
 
 ## Not covered (larger efforts, decide before starting)
 - [ ] Native fallback render: no JavaScript (needs a JS engine + DOM; the Chromium engine covers it), no floats/positioning, flex/grid are equal-width columns only
-- [ ] Scanner: no stored XSS, DOM checks only via DOM Invader, no XXE checks
+- [ ] Scanner: no stored XSS, DOM checks only via DOM Invader, no XXE checks; request smuggling is timing-only (no obfuscated Transfer-Encoding variants, no H2 downgrade, no differential confirmation)
 - [ ] API scanning: JSON definitions only (no YAML); BChecks: subset of the original syntax (no loops, variables, `run for each`)
 - [ ] BurpCraft AI: a live answer was not exercised on the dev machine (no Anthropic API key there)
 - [ ] Project files are written on save/exit, not continuously like a disk-based project
