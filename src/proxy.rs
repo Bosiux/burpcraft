@@ -2,6 +2,7 @@
 use std::collections::VecDeque;
 use std::io::{self, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
+use std::sync::atomic::{AtomicU16, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
 
 use crate::net::{self, Ca, Stream};
@@ -460,6 +461,13 @@ impl Shared {
     }
 }
 
+static LISTEN_PORT: AtomicU16 = AtomicU16::new(0);
+
+/// The proxy's port, for code without the shared state (Chromium render); None until it listens.
+pub fn listen_port() -> Option<u16> {
+    Some(LISTEN_PORT.load(Ordering::Relaxed)).filter(|&p| p != 0)
+}
+
 pub fn start(state: State, ca: Arc<Ca>, port: u16) {
     let listener = match TcpListener::bind(("127.0.0.1", port)) {
         Ok(l) => l,
@@ -471,6 +479,9 @@ pub fn start(state: State, ca: Arc<Ca>, port: u16) {
             return;
         }
     };
+    // port 0 asks the OS for a free port
+    let port = listener.local_addr().map_or(port, |a| a.port());
+    LISTEN_PORT.store(port, Ordering::Relaxed);
     {
         let mut s = state.lock().unwrap();
         s.listener = Some(port);

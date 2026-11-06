@@ -1030,7 +1030,7 @@ pub fn page_with_base(html: &str, base: Option<&str>) -> String {
 }
 
 /// Command-line arguments for a headless run; `out` is `--screenshot=<png>` or `--dump-dom`.
-/// Sub-resources go through the BurpCraft proxy.
+/// Sub-resources go through the BurpCraft proxy when it listens on `proxy_port`.
 pub fn chromium_args(
     profile: &std::path::Path,
     out: &str,
@@ -1038,17 +1038,15 @@ pub fn chromium_args(
     width: u32,
     height: u32,
     scale: f32,
+    proxy_port: Option<u16>,
 ) -> Vec<String> {
-    vec![
+    let mut args: Vec<String> = vec![
         "--headless=new".into(),
         "--disable-gpu".into(),
         "--hide-scrollbars".into(),
         "--no-first-run".into(),
         "--no-default-browser-check".into(),
         "--use-mock-keychain".into(),
-        "--proxy-server=127.0.0.1:8080".into(),
-        // Chrome skips the proxy for localhost by default; local targets must show up too
-        "--proxy-bypass-list=<-loopback>".into(),
         "--ignore-certificate-errors".into(),
         // keep Chrome's own update/telemetry requests out of the proxy history
         "--disable-background-networking".into(),
@@ -1065,9 +1063,16 @@ pub fn chromium_args(
         format!("--force-device-scale-factor={scale}"),
         // lets scripts run and timers settle before the capture
         "--virtual-time-budget=3000".into(),
-        out.into(),
-        format!("file://{}", page.display()),
-    ]
+    ];
+    if let Some(port) = proxy_port {
+        args.extend([
+            format!("--proxy-server=127.0.0.1:{port}"),
+            // Chrome skips the proxy for localhost by default; local targets must show up too
+            "--proxy-bypass-list=<-loopback>".into(),
+        ]);
+    }
+    args.extend([out.into(), format!("file://{}", page.display())]);
+    args
 }
 
 /// Appended to the page for the measuring pass: after load (images sized), records the document height.
@@ -1140,6 +1145,7 @@ pub fn chromium_shot(
     let dir = std::env::temp_dir().join("burpcraft-render");
     let page = page_with_base(html, base);
     let ctx = ctx.clone();
+    let proxy_port = crate::proxy::listen_port();
     std::thread::spawn(move || {
         // one profile per render: concurrent renders on a shared profile exit with status 21 (profile in use)
         let profile = dir.join(format!("{key:x}-profile"));
@@ -1159,6 +1165,7 @@ pub fn chromium_shot(
                         width,
                         600,
                         scale,
+                        proxy_port,
                     ))
                     .stdout(out),
                 || std::fs::read_to_string(&dom).is_ok_and(|d| d.contains("</html>")),
@@ -1176,7 +1183,9 @@ pub fn chromium_shot(
             let shot = format!("--screenshot={}", png.display());
             run_chromium(
                 std::process::Command::new(&bin)
-                    .args(chromium_args(&profile, &shot, &file, width, height, scale))
+                    .args(chromium_args(
+                        &profile, &shot, &file, width, height, scale, proxy_port,
+                    ))
                     .stdout(std::process::Stdio::null()),
                 || std::fs::metadata(&png).is_ok_and(|m| m.len() > 0),
             )?;
@@ -1252,6 +1261,7 @@ mod tests {
             800,
             2400,
             2.0,
+            Some(8090),
         );
         assert!(
             a.contains(&"--headless=new".to_string())
@@ -1266,7 +1276,19 @@ mod tests {
             Some(3187)
         );
         assert_eq!(measured_height("<html><body>"), None);
-        assert!(a.contains(&"--proxy-server=127.0.0.1:8080".to_string()));
+        assert!(a.contains(&"--proxy-server=127.0.0.1:8090".to_string()));
+        // proxy not running: straight to the network, never to whatever holds 8080
+        let direct = chromium_args(
+            std::path::Path::new("/p"),
+            "--dump-dom",
+            std::path::Path::new("/x.html"),
+            800,
+            600,
+            1.0,
+            None,
+        );
+        assert!(!direct.iter().any(|x| x.starts_with("--proxy")));
+        assert_eq!(direct.last().unwrap(), "file:///x.html");
         assert!(
             a.contains(&"--disable-background-networking".to_string())
                 && a.contains(&"--proxy-bypass-list=<-loopback>".to_string())
