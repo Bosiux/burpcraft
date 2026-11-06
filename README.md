@@ -97,6 +97,8 @@ curl -i -X POST -d '{"urls":["http://target.example/"]}' http://127.0.0.1:1337/v
 curl http://127.0.0.1:1337/v0.1/scan/1                                                     # status and issues
 ```
 
+`POST /v0.1/scan` takes the same fields as MCP `scan_start` (`request`/`target`, `openapi`, `headers`, `login`, `threads`, `delay_ms`, `crawl`), plus Burp-style `scan_configurations` and a per-scan `scope`: `{"include":[{"rule":"http://t/"}],"exclude":[{"rule":"http://t/logout"}]}`. Without one, the Target scope applies.
+
 ## MCP server (AI agents)
 
 Agents drive the running app over [MCP](https://modelcontextprotocol.io): read traffic, send and fuzz requests,
