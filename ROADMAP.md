@@ -47,7 +47,7 @@ into `<OUT>.png` with sample traffic (uses the BURPCRAFT_SHOT / BURPCRAFT_TAB de
 ## Not covered (larger efforts, decide before starting)
 - [ ] Native fallback render: no JavaScript (needs a JS engine + DOM; the Chromium engine covers it), no floats/positioning, flex/grid are equal-width columns only
 - [ ] Scanner: no stored XSS, DOM checks only via DOM Invader, no HTTP request smuggling / deserialization / XXE checks
-- [ ] API scanning: JSON definitions only (no YAML); BChecks: subset of the original syntax (no loops, variables, `run for each`)
+- [ ] BChecks: subset of the original syntax (no loops, variables, `run for each`)
 - [ ] BurpCraft AI: a live answer was not exercised on the dev machine (no Anthropic API key there)
 - [ ] Project files are written on save/exit, not continuously like a disk-based project
 
@@ -77,7 +77,7 @@ Status: ✅ done · 🟡 partial · ❌ missing
 | Scan configurations | Fast/thorough profiles, chosen checks, rate limits | ✅ New scan dialog: Fast/Thorough, per-check toggles, pages, threads, delay |
 | Live tasks | Automatic audit (passive or active) of traffic as it passes the proxy | ✅ passive always; "New live task" = active audit of in-scope proxied requests |
 | BChecks | Custom scan checks in a small declarative language | ✅ subset of the syntax: given response/host/insertion point, send payload/request, matches/in/is with and/or/not; editor in Extensions → BChecks |
-| API-definition scanning | Import OpenAPI/Swagger and scan the endpoints | ✅ OpenAPI 3 / Swagger 2 JSON (no YAML) |
+| API-definition scanning | Import OpenAPI/Swagger and scan the endpoints | ✅ OpenAPI 3 / Swagger 2, JSON or YAML |
 | Authenticated scanning | Recorded login or credentials used during crawl/audit | ✅ extra headers + raw login request whose cookies join every request |
 | Reports | Export issues as HTML/XML | ✅ Dashboard "Report (HTML)" / "Export (XML)", with request/response evidence, in ~/.burpcraft/reports |
 | Project files | Save/reopen all state on disk: history, site map, Repeater, issues, settings | ✅ Project menu Open/Save/Save as, Ctrl+S, `burpcraft <file>`, saved on exit (gzip, own format) |
