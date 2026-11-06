@@ -43,9 +43,10 @@ into `<OUT>.png` with sample traffic (uses the BURPCRAFT_SHOT / BURPCRAFT_TAB de
 - [x] Chromium render verified on macOS with Chrome for Testing 157 (CSS flex/grid, JS, image sub-resource via the proxy). Fixes: Chrome for Testing searched first (Brave 156 hangs headless), loopback targets forced through the proxy (`<-loopback>`), Chrome's own update/time/AI-Mode traffic kept out of the history, one profile per render (shared profile -> exit 21), stale PNG from a previous run no longer reused
 - [x] Chromium render: full-page capture (measure pass with --dump-dom, then screenshot at that height, capped at the GPU texture limit) and HiDPI-sharp at full pane width (device scale factor = pixels per point)
 - [x] Native render: box model (background, padding, margin, border, radius), display:flex rows and display:grid columns, full content inside table cells (images, links, form controls, nested tables)
+- [x] Native render: proportional flex (flex-grow/flex shorthand, width/flex-basis px and %, gap, justify-content), grid-template-columns px/%/fr/minmax/repeat incl. auto-fill, float:left/right as side columns, display:none children skipped in flex/grid
 
 ## Not covered (larger efforts, decide before starting)
-- [ ] Native fallback render: no JavaScript (needs a JS engine + DOM; the Chromium engine covers it), no floats/positioning, flex/grid are equal-width columns only
+- [ ] Native fallback render: no JavaScript (needs a JS engine + DOM; the Chromium engine covers it); flex has no wrap/align-items/order and auto items are sized from their text length; grid has no spans or row tracks; floats are side columns (text does not wrap under them); position:absolute/fixed stay in place in document order; a stylesheet `color` on `<a>` is overridden by the link blue
 - [ ] Scanner: no stored XSS, DOM checks only via DOM Invader, no HTTP request smuggling / deserialization / XXE checks
 - [ ] API scanning: JSON definitions only (no YAML); BChecks: subset of the original syntax (no loops, variables, `run for each`)
 - [ ] BurpCraft AI: a live answer was not exercised on the dev machine (no Anthropic API key there)
