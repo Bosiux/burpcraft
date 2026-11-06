@@ -3,7 +3,7 @@ use eframe::egui::{self, RichText};
 use egui_extras::{Column, TableBuilder};
 
 use crate::proxy::Entry;
-use crate::theme;
+use crate::ui::theme;
 
 /// Opens a file or URL with the OS default handler.
 pub fn open_external(target: impl AsRef<std::ffi::OsStr>) -> std::io::Result<()> {
@@ -125,7 +125,7 @@ impl Organizer {
         if let Some((e, _, _)) = self.selected.and_then(|i| self.items.get(i)) {
             let mut req = String::from_utf8_lossy(&e.req).into_owned();
             let mut resp = crate::proxy::display(&e.resp);
-            crate::editor::split(
+            crate::ui::editor::split(
                 ui,
                 ("oreq", e.id),
                 &mut req,
@@ -232,7 +232,7 @@ impl Settings {
                             .changed();
                     });
                     ui.add_space(8.0);
-                    crate::update::settings(ui);
+                    crate::project::update::settings(ui);
                     ui.add_space(8.0);
                     theme::heading(ui, "Hotkeys");
                     egui::Grid::new("hotkeys").striped(true).show(ui, |ui| {
