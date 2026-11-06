@@ -60,6 +60,28 @@ into `<OUT>.png` with sample traffic (uses the BURPCRAFT_SHOT / BURPCRAFT_TAB de
 - [ ] Intruder "Collaborator payloads" payload type is driven from the UI only (not exposed over MCP/REST)
 - [ ] e2e_scan.py: the request-smuggling **positive** (a raw CL.TE/TE.CL front end that hangs) is opt-in via `E2E_SMUGGLE=1` because each timing probe waits out a 10 s hang; the default run only asserts the check doesn't false-positive on the well-behaved app
 
+## Roadmap: next power-ups (prioritized)
+
+Direction for making the tool more capable, not wider. BurpCraft already matches Community Burp and much of Pro in surface area; the leverage now is **depth, accuracy and scale**. Each item names the gap, a concrete approach that reuses what already exists, and a rough size (S/M/L). Ordered by value / effort.
+
+### P1 — correctness and coverage (do first)
+- [ ] **Enforce Target scope across every tool.** Today a scan only stays on the origins it is handed and the crawler is same-origin; the Target include/exclude scope is not consulted by `scan/` or `scan/crawl.rs`. A scan can therefore touch hosts the tester is not authorized for — a correctness and safety problem, not a feature. Approach: thread a scope predicate into `scan::Ctx` and check it before every `send`/crawl enqueue, before OOB payloads, and default scope-on for scans started over MCP/REST. (S, high impact)
+- [ ] **Browser-driven crawling for modern apps.** The crawler is BFS over `<a>` links and GET/POST forms, so it misses SPAs and every XHR/`fetch` endpoint — the bulk of modern apps. Approach: reuse the existing headless-Chromium integration (`render/chromium.rs`, which already drives pages through the proxy) to navigate with JS enabled; the proxy already records the resulting requests, so feed those into the site map and the audit queue. Turns the scanner from "classic apps" to "real apps". (L, highest coverage gain)
+- [ ] **Passive-scan all tool traffic, not just the proxy.** `security/scanner.rs::passive` runs on proxied entries only; Repeater, Intruder and crawl/audit responses are not analysed. Approach: run `passive` on every `Entry` regardless of originating tool (they already flow through the logger). (S)
+- [ ] **Richer insertion points.** `scan/points.rs` covers query/body/cookie/JSON/XML and only the User-Agent/Referer headers. Add: all request headers, `multipart/form-data` parts, deeply-nested JSON/XML values, URL path segments, and JWT claims. More points = more findings per request. (M)
+
+### P2 — engagement realism and scale
+- [ ] **Session handling / re-authentication.** Long scans die when the session expires. Build on the existing authenticated-scan primitive (a raw login request whose cookies join every request): add a "logged-out" detector (status/redirect/marker) and a macro that re-runs the login and refreshes cookies mid-scan — Burp's session-handling rules, minimally. Essential for real engagements. (M)
+- [ ] **Full REST control plane, at parity with MCP.** `automation/rest.rs` `/v0.1/scan` lacks the API-definition, auth, threads, delay and scope fields that `mcp::scan_start` already has. Bring REST to parity and expose scope/issue management, so CI and external tooling can drive the whole flow. The MCP server is a genuine differentiator (AI agents operate the tool) — lean into making *everything* scriptable. (S-M)
+- [ ] **Cut false positives with confirmation.** Smuggling and ViewState checks are reported Tentative by nature. Generalise the confirm-twice/baseline pattern already used for time- and boolean-based SQLi to the other classes, and add issue de-duplication plus a per-project false-positive suppression list. (M)
+- [ ] **Crash-safe incremental project files.** `project/project.rs` rewrites the whole gzip file every 30 s, so a crash loses up to 30 s and large projects re-serialize fully each time. Move to an append-only change log (or segmented writes) so state is durable continuously, like Burp's disk-based project. (L)
+- [ ] **Harden the HTTP client.** `http/net.rs` buffers whole response bodies in memory with no cap, so a hostile multi-GB response can exhaust RAM. Add a configurable max body size and stream oversized bodies to disk. (S-M)
+
+### Big bets — new attack surface
+- [ ] **GraphQL toolkit.** No GraphQL support today. Add: introspection query + schema parsing, auto-generated queries/mutations turned into insertion points, and checks for introspection-enabled endpoints, query batching abuse and argument injection. A major modern surface Burp covers. (L)
+- [ ] **JWT toolkit.** The Decoder has base64/hash but no JWT awareness. Add a JWT editor and attacks: `alg:none`, RS->HS key confusion, weak-secret brute force (wordlist), and claim/expiry tampering, plus a JWT insertion point in `Authorization`. (M)
+- [ ] **Active WebSocket and richer protocol testing.** The proxy relays and records WebSockets but does not attack them; add WS message fuzzing/replay (reuse Intruder payloads over the existing `proxy/ws.rs` relay). Further out: HTTP/3, gRPC/protobuf decoding. (M-L)
+
 ## Done (iteration 4): Pro features
 Everything in the table below is implemented; see the per-row notes. Self-hosting:
 `cargo run -p burpcraft-server -- --domain oast.example.com --public-ip <ip> --bind 0.0.0.0 --dns 53 --http 80 --smtp 25 --secret <s> --bapps server/bapps`
