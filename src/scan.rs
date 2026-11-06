@@ -409,13 +409,13 @@ impl Ctx {
             };
             let req = get_request(&self.target, path).replacen("GET ", &format!("{method} "), 1);
             if let Some((resp, _)) = self.send(&req)
-                && b.holds(&crate::bcheck::Responses {
+                && let Some(m) = b.matched(&crate::bcheck::Responses {
                     latest: &resp,
                     base: None,
                 })
             {
                 let e = entry_of(&self.target, &req, &resp, "Scanner");
-                self.report_issue(b.issue(e.origin(), e.path().to_string(), 0), e);
+                self.report_issue(m.issue(e.origin(), e.path().to_string(), 0), e);
             }
         }
     }
@@ -536,13 +536,13 @@ fn audit_point(c: &Ctx, req: &str, p: &Point, base: &(Vec<u8>, Duration)) {
         };
         let r = inject(req, p, &value);
         if let Some((resp, _)) = c.send(&r)
-            && b.holds(&crate::bcheck::Responses {
+            && let Some(m) = b.matched(&crate::bcheck::Responses {
                 latest: &resp,
                 base: Some(&base.0),
             })
         {
             let e = entry_of(&c.target, &r, &resp, "Scanner");
-            let mut issue = b.issue(e.origin(), e.path().to_string(), 0);
+            let mut issue = m.issue(e.origin(), e.path().to_string(), 0);
             issue.detail = format!("{} ({})", issue.detail, p.label());
             c.report_issue(issue, e);
         }
