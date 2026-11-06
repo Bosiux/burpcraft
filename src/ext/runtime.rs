@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex, OnceLock, mpsc};
 use std::time::Duration;
 
 use crate::http::codec::{base64_decode, base64_encode};
-use crate::openapi::{J, parse};
+use crate::automation::openapi::{J, parse};
 use crate::proxy::{Entry, State};
 
 pub struct Ext {

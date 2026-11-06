@@ -1,6 +1,6 @@
 //! Shared helpers for the tool handlers: JSON builders, argument extractors, and
 //! message formatting (decoded display text, raw CRLF conversion, target/source).
-use crate::openapi::J;
+use crate::automation::openapi::J;
 use crate::proxy::{self, Entry};
 use crate::{http::net, scan, tools};
 

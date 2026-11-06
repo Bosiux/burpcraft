@@ -5,7 +5,7 @@
 use std::sync::atomic::Ordering;
 use std::time::Instant;
 
-use crate::openapi::{self, J};
+use crate::automation::openapi::{self, J};
 use crate::proxy::{self, Entry, Rule};
 use crate::{http::codec, security::collab, http::net, scan};
 
@@ -476,7 +476,7 @@ pub(crate) fn call(name: &str, a: &J, ctx: &Ctx) -> Result<J, String> {
 
 /// Reuses the REST API's JSON for scans and issues.
 fn rest_get(path: &str, ctx: &Ctx) -> Result<J, String> {
-    let (status, _, body) = crate::rest::route("GET", path, "", "", &ctx.tasks, &ctx.state);
+    let (status, _, body) = crate::automation::rest::route("GET", path, "", "", &ctx.tasks, &ctx.state);
     let j = openapi::parse(&body).map_err(|e| e.to_string())?;
     if status.starts_with("200") {
         Ok(j)

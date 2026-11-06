@@ -11,7 +11,7 @@ use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 
-use crate::openapi::J;
+use crate::automation::openapi::J;
 use crate::proxy::State;
 use crate::scan::{self, Task};
 
@@ -102,7 +102,7 @@ pub fn route(
         ),
         ("GET", "/v0.1/issues") => ("200 OK", String::new(), issues_json(state, None).to_json()),
         ("POST", "/v0.1/scan") => {
-            let req = match crate::openapi::parse(body) {
+            let req = match crate::automation::openapi::parse(body) {
                 Ok(j) => j,
                 Err(e) => {
                     return (
@@ -282,7 +282,7 @@ mod tests {
             }
             std::thread::sleep(std::time::Duration::from_millis(20));
         }
-        let j = crate::openapi::parse(&body).unwrap();
+        let j = crate::automation::openapi::parse(&body).unwrap();
         assert_eq!(j.get("scan_status"), Some(&J::Str("succeeded".into())));
         assert_eq!(j.get("issue_events"), Some(&J::Arr(vec![])));
         assert_eq!(

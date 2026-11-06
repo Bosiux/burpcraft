@@ -101,13 +101,13 @@ pub fn parse_findings(text: &str) -> Vec<Finding> {
     } else {
         text.to_string()
     };
-    let field = |j: &crate::openapi::J, k: &str| match j.get(k) {
-        Some(crate::openapi::J::Str(s)) => s.clone(),
+    let field = |j: &crate::automation::openapi::J, k: &str| match j.get(k) {
+        Some(crate::automation::openapi::J::Str(s)) => s.clone(),
         _ => String::new(),
     };
-    let items = match crate::openapi::parse(json.trim()) {
-        Ok(crate::openapi::J::Arr(v)) => v,
-        Ok(o @ crate::openapi::J::Obj(_)) => vec![o],
+    let items = match crate::automation::openapi::parse(json.trim()) {
+        Ok(crate::automation::openapi::J::Arr(v)) => v,
+        Ok(o @ crate::automation::openapi::J::Obj(_)) => vec![o],
         _ => vec![],
     };
     items

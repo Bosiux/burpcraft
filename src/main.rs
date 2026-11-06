@@ -7,13 +7,12 @@ mod http;
 mod intruder;
 #[cfg(target_os = "macos")]
 mod macmenu;
+mod automation;
 mod mcp;
 mod misc;
-mod openapi;
 mod project;
 mod proxy;
 mod render;
-mod rest;
 mod scan;
 mod search;
 mod security;
@@ -27,6 +26,7 @@ use std::sync::Arc;
 
 use eframe::egui::{self, RichText};
 
+use automation::rest;
 use http::net;
 use project::update;
 use proxy::{Entry, State};

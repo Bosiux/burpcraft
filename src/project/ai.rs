@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 
-use crate::openapi::J;
+use crate::automation::openapi::J;
 
 pub const MODEL: &str = "claude-opus-5-5";
 /// Evidence above this size is cut, and the prompt says so (never silently).
@@ -78,7 +78,7 @@ pub fn request_body(issue: &crate::security::scanner::Issue, req: &[u8], resp: &
 
 /// Text of a Messages API response body, or a readable error (API error, refusal, truncation).
 pub fn parse_response(status: u16, body: &str) -> Result<String, String> {
-    let j = crate::openapi::parse(body)
+    let j = crate::automation::openapi::parse(body)
         .map_err(|e| format!("unreadable API response ({status}): {e}"))?;
     let s = |j: Option<&J>| {
         if let Some(J::Str(v)) = j {
@@ -187,7 +187,7 @@ mod tests {
             entry_id: 1,
         };
         let big = vec![b'x'; MAX_EVIDENCE + 10];
-        let body = crate::openapi::parse(&request_body(
+        let body = crate::automation::openapi::parse(&request_body(
             &issue,
             b"GET /item?id=1' HTTP/1.1\r\n\r\n",
             &big,

@@ -5,9 +5,9 @@
 //!   claude mcp add --transport http burpcraft http://127.0.0.1:1338/mcp [--header "Authorization: Bearer <token>"]
 //!
 //! The tool descriptions in `TOOLS` are the documentation agents read: keep them short and exact.
-use crate::openapi::{self, J};
+use crate::automation::openapi::{self, J};
 use crate::proxy::State;
-use crate::rest::Tasks;
+use crate::automation::rest::Tasks;
 use crate::target::Scope;
 
 mod attack;

@@ -4,7 +4,7 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
 
-use crate::openapi::J;
+use crate::automation::openapi::J;
 use crate::{intruder, http::net, proxy, tools};
 
 use super::Ctx;

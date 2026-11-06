@@ -6,7 +6,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use eframe::egui::{self, RichText};
 
-use crate::openapi::J;
+use crate::automation::openapi::J;
 use crate::theme;
 
 const REPO: &str = "Bosiux/burpcraft";
@@ -109,7 +109,7 @@ fn fetch_releases() -> Result<J, String> {
     if head.split_whitespace().nth(1) != Some("200") {
         return Err(head.lines().next().unwrap_or_default().to_string());
     }
-    crate::openapi::parse(&String::from_utf8_lossy(&crate::proxy::body_bytes(&resp)))
+    crate::automation::openapi::parse(&String::from_utf8_lossy(&crate::proxy::body_bytes(&resp)))
 }
 
 /// Highest published tag above `current`; pre-releases only when `current` is one.
@@ -275,7 +275,7 @@ mod tests {
     }
 
     fn releases() -> J {
-        crate::openapi::parse(
+        crate::automation::openapi::parse(
             r#"[
               {"tag_name":"v0.3.0","draft":true,"prerelease":false},
               {"tag_name":"v0.2.1-beta.1","draft":false,"prerelease":true},
