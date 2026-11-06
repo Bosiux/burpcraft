@@ -146,62 +146,59 @@ impl App {
         }
         let mut open = true;
         let mut go = None;
-        egui::Window::new("Search")
-            .open(&mut open)
-            .default_size([760.0, 480.0])
-            .show(ctx, |ui| {
-                let sr = &mut self.search;
-                let mut run = false;
-                ui.horizontal(|ui| {
-                    run |= ui
-                        .add(
-                            egui::TextEdit::singleline(&mut sr.text)
-                                .hint_text("search all tools")
-                                .desired_width(360.0),
-                        )
-                        .lost_focus()
-                        && ui.input(|i| i.key_pressed(egui::Key::Enter));
-                    ui.checkbox(&mut sr.case, "Case sensitive");
-                    ui.checkbox(&mut sr.regex, "Regex");
-                    run |= ui.button("Search").clicked();
-                });
-                if run {
-                    let q = Query {
-                        text: sr.text.clone(),
-                        regex: sr.regex,
-                        case: sr.case,
-                    };
-                    (sr.hits, sr.error) = (vec![], String::new());
-                    match find(&q, corpus(&self.state, &self.repeater).into_iter()) {
-                        Ok(h) => self.search.hits = h,
-                        Err(e) => self.search.error = e,
-                    }
-                }
-                let sr = &self.search;
-                if !sr.error.is_empty() {
-                    ui.colored_label(egui::Color32::from_rgb(0xC0, 0x30, 0x30), &sr.error);
-                }
-                ui.label(format!(
-                    "{} result{}",
-                    sr.hits.len(),
-                    if sr.hits.len() == 1 { "" } else { "s" }
-                ));
-                egui::ScrollArea::vertical()
-                    .auto_shrink([false; 2])
-                    .show(ui, |ui| {
-                        for h in &sr.hits {
-                            let r = ui.add(
-                                egui::Label::new(egui::RichText::new(&h.label).strong())
-                                    .sense(egui::Sense::click()),
-                            );
-                            ui.label(egui::RichText::new(&h.snippet).monospace().small());
-                            if r.clicked() {
-                                go = Some(h.place.clone());
-                            }
-                            ui.separator();
-                        }
-                    });
+        crate::theme::window(ctx, "Search", [760.0, 480.0], &mut open, |ui| {
+            let sr = &mut self.search;
+            let mut run = false;
+            ui.horizontal(|ui| {
+                run |= ui
+                    .add(
+                        egui::TextEdit::singleline(&mut sr.text)
+                            .hint_text("search all tools")
+                            .desired_width(360.0),
+                    )
+                    .lost_focus()
+                    && ui.input(|i| i.key_pressed(egui::Key::Enter));
+                ui.checkbox(&mut sr.case, "Case sensitive");
+                ui.checkbox(&mut sr.regex, "Regex");
+                run |= ui.button("Search").clicked();
             });
+            if run {
+                let q = Query {
+                    text: sr.text.clone(),
+                    regex: sr.regex,
+                    case: sr.case,
+                };
+                (sr.hits, sr.error) = (vec![], String::new());
+                match find(&q, corpus(&self.state, &self.repeater).into_iter()) {
+                    Ok(h) => self.search.hits = h,
+                    Err(e) => self.search.error = e,
+                }
+            }
+            let sr = &self.search;
+            if !sr.error.is_empty() {
+                ui.colored_label(egui::Color32::from_rgb(0xC0, 0x30, 0x30), &sr.error);
+            }
+            ui.label(format!(
+                "{} result{}",
+                sr.hits.len(),
+                if sr.hits.len() == 1 { "" } else { "s" }
+            ));
+            egui::ScrollArea::vertical()
+                .auto_shrink([false; 2])
+                .show(ui, |ui| {
+                    for h in &sr.hits {
+                        let r = ui.add(
+                            egui::Label::new(egui::RichText::new(&h.label).strong())
+                                .sense(egui::Sense::click()),
+                        );
+                        ui.label(egui::RichText::new(&h.snippet).monospace().small());
+                        if r.clicked() {
+                            go = Some(h.place.clone());
+                        }
+                        ui.separator();
+                    }
+                });
+        });
         self.search.open = open;
         match go {
             Some(Place::History(id)) => {

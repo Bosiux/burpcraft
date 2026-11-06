@@ -342,19 +342,39 @@ impl App {
             return;
         };
         let (mut open, mut go) = (true, false);
-        egui::Window::new("New scan").open(&mut open).default_width(560.0).show(ctx, |ui| {
+        theme::window(ctx, "New scan", [560.0, 640.0], &mut open, |ui| {
             ui.label("URLs to scan (one per line):");
-            ui.add(egui::TextEdit::multiline(&mut urls).desired_rows(3).desired_width(f32::INFINITY).hint_text("https://target.example/"));
+            ui.add(
+                egui::TextEdit::multiline(&mut urls)
+                    .desired_rows(3)
+                    .desired_width(f32::INFINITY)
+                    .hint_text("https://target.example/"),
+            );
             ui.horizontal(|ui| {
                 ui.label("Scan configuration:");
                 if ui.button("Fast").clicked() {
-                    cfg = scan::Config { headers: cfg.headers.clone(), login: cfg.login.clone(), ..scan::Config::fast() };
+                    cfg = scan::Config {
+                        headers: cfg.headers.clone(),
+                        login: cfg.login.clone(),
+                        ..scan::Config::fast()
+                    };
                 }
-                if ui.button("Thorough").on_hover_text("Adds time-based checks and crawls up to 500 pages").clicked() {
-                    cfg = scan::Config { headers: cfg.headers.clone(), login: cfg.login.clone(), ..scan::Config::thorough() };
+                if ui
+                    .button("Thorough")
+                    .on_hover_text("Adds time-based checks and crawls up to 500 pages")
+                    .clicked()
+                {
+                    cfg = scan::Config {
+                        headers: cfg.headers.clone(),
+                        login: cfg.login.clone(),
+                        ..scan::Config::thorough()
+                    };
                 }
             });
-            ui.checkbox(&mut cfg.crawl, "Crawl from the URLs (otherwise audit them only)");
+            ui.checkbox(
+                &mut cfg.crawl,
+                "Crawl from the URLs (otherwise audit them only)",
+            );
             egui::Grid::new("checks").num_columns(3).show(ui, |ui| {
                 for (i, name) in scan::CHECKS.iter().enumerate() {
                     ui.checkbox(&mut cfg.checks[i], *name);
@@ -379,7 +399,11 @@ impl App {
             });
             ui.collapsing("API definition", |ui| {
                 ui.label("OpenAPI / Swagger JSON file to audit every operation of:");
-                ui.add(egui::TextEdit::singleline(&mut api).hint_text("/path/to/openapi.json").desired_width(f32::INFINITY));
+                ui.add(
+                    egui::TextEdit::singleline(&mut api)
+                        .hint_text("/path/to/openapi.json")
+                        .desired_width(f32::INFINITY),
+                );
             });
             ui.collapsing("Schedule", |ui| {
                 ui.horizontal(|ui| {
@@ -390,7 +414,15 @@ impl App {
                     ui.label("hours (0 = once)");
                 });
             });
-            go = theme::primary_button(ui, if at.trim().is_empty() { "Scan" } else { "Schedule scan" }).clicked();
+            go = theme::primary_button(
+                ui,
+                if at.trim().is_empty() {
+                    "Scan"
+                } else {
+                    "Schedule scan"
+                },
+            )
+            .clicked();
         });
         if go {
             let list: Vec<String> = urls
@@ -451,35 +483,37 @@ impl App {
         };
         let mut open = true;
         let mut done = false;
-        egui::Window::new(if saving {
-            "Save project"
-        } else {
-            "Open project"
-        })
-        .open(&mut open)
-        .collapsible(false)
-        .resizable(false)
-        .show(ctx, |ui| {
-            ui.label("Project file:");
-            ui.add(egui::TextEdit::singleline(&mut path).desired_width(420.0));
-            if !msg.is_empty() {
-                ui.label(RichText::new(&msg).color(theme::muted()));
-            }
-            if ui.button(if saving { "Save" } else { "Open" }).clicked() {
-                let p = std::path::PathBuf::from(path.trim());
-                let result = if saving {
-                    self.save_project(p)
-                } else {
-                    project::open(self, &p)
-                        .map(|()| self.project = Some(p))
-                        .map_err(|e| format!("Failed to open: {e}"))
-                };
-                match result {
-                    Ok(()) => done = true,
-                    Err(e) => msg = e,
+        theme::window(
+            ctx,
+            if saving {
+                "Save project"
+            } else {
+                "Open project"
+            },
+            [460.0, 160.0],
+            &mut open,
+            |ui| {
+                ui.label("Project file:");
+                ui.add(egui::TextEdit::singleline(&mut path).desired_width(420.0));
+                if !msg.is_empty() {
+                    ui.label(RichText::new(&msg).color(theme::muted()));
                 }
-            }
-        });
+                if ui.button(if saving { "Save" } else { "Open" }).clicked() {
+                    let p = std::path::PathBuf::from(path.trim());
+                    let result = if saving {
+                        self.save_project(p)
+                    } else {
+                        project::open(self, &p)
+                            .map(|()| self.project = Some(p))
+                            .map_err(|e| format!("Failed to open: {e}"))
+                    };
+                    match result {
+                        Ok(()) => done = true,
+                        Err(e) => msg = e,
+                    }
+                }
+            },
+        );
         if open && !done {
             self.project_dlg = Some((saving, path, msg));
         }
@@ -1083,10 +1117,13 @@ impl App {
         });
         if self.hfilter_open {
             let mut open = true;
-            egui::Window::new("HTTP history filter")
-                .open(&mut open)
-                .collapsible(false)
-                .show(ui.ctx(), |ui| self.hfilter.ui(ui));
+            theme::window(
+                ui.ctx(),
+                "HTTP history filter",
+                [640.0, 420.0],
+                &mut open,
+                |ui| self.hfilter.ui(ui),
+            );
             self.hfilter_open = open;
         }
         let sel = self
@@ -1118,13 +1155,10 @@ impl App {
         if let Some((id, text)) = &mut self.comment_edit {
             let mut open = true;
             let mut ok = false;
-            egui::Window::new("Add comment")
-                .collapsible(false)
-                .open(&mut open)
-                .show(ui.ctx(), |ui| {
-                    ui.text_edit_singleline(text);
-                    ok = theme::primary_button(ui, "OK").clicked();
-                });
+            theme::window(ui.ctx(), "Add comment", [360.0, 110.0], &mut open, |ui| {
+                ui.text_edit_singleline(text);
+                ok = theme::primary_button(ui, "OK").clicked();
+            });
             if ok {
                 let mut s = self.state.lock().unwrap();
                 if let Some(e) = s.history.iter_mut().find(|e| e.id == *id) {

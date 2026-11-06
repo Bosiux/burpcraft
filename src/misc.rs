@@ -189,85 +189,78 @@ impl Settings {
     pub fn window(&mut self, ctx: &egui::Context, state: &crate::proxy::State) -> bool {
         let mut changed = false;
         let mut open = self.open;
-        egui::Window::new("Settings")
-            .open(&mut open)
-            .default_size([760.0, 480.0])
-            .collapsible(false)
-            .show(ctx, |ui| {
-                egui::Panel::left("settings_nav")
-                    .default_size(180.0)
-                    .show(ui, |ui| {
-                        for (i, s) in ["User interface", "Proxy", "Network", "Sessions"]
-                            .iter()
-                            .enumerate()
-                        {
-                            if ui.selectable_label(self.section == i, *s).clicked() {
-                                self.section = i;
-                            }
+        theme::window(ctx, "Settings", [760.0, 480.0], &mut open, |ui| {
+            egui::Panel::left("settings_nav")
+                .default_size(180.0)
+                .show(ui, |ui| {
+                    for (i, s) in ["User interface", "Proxy", "Network", "Sessions"]
+                        .iter()
+                        .enumerate()
+                    {
+                        if ui.selectable_label(self.section == i, *s).clicked() {
+                            self.section = i;
                         }
-                    });
-                egui::CentralPanel::default().show(ui, |ui| match self.section {
-                    0 => {
-                        theme::heading(ui, "Appearance");
-                        ui.horizontal(|ui| {
-                            ui.label("Theme:");
-                            changed |= ui.radio_value(&mut self.dark, false, "Light").changed();
-                            changed |= ui.radio_value(&mut self.dark, true, "Dark").changed();
-                        });
-                        ui.horizontal(|ui| {
-                            ui.label("Font size:");
-                            changed |= ui
-                                .add(
-                                    egui::Slider::new(&mut self.font_size, 10.0..=20.0)
-                                        .step_by(1.0),
-                                )
-                                .changed();
-                        });
-                        ui.add_space(8.0);
-                        theme::heading(ui, "Hotkeys");
-                        egui::Grid::new("hotkeys").striped(true).show(ui, |ui| {
-                            for (a, k) in [
-                                ("Send to Repeater", "Ctrl+R"),
-                                ("Send to Intruder", "Ctrl+I"),
-                                ("Issue Repeater request", "Ctrl+Space"),
-                                ("Forward intercepted message", "Ctrl+F"),
-                                ("Toggle intercept", "Ctrl+T"),
-                                (
-                                    "Switch to Dashboard / Target / Proxy / Intruder / Repeater",
-                                    "Ctrl+Shift+D / T / P / I / R",
-                                ),
-                            ] {
-                                ui.label(a);
-                                ui.monospace(k);
-                                ui.end_row();
-                            }
-                        });
-                    }
-                    1 => {
-                        let s = state.lock().unwrap();
-                        theme::heading(ui, "Proxy listeners");
-                        ui.label(format!(
-                            "127.0.0.1:{} (running: {})",
-                            s.listener.unwrap_or(8080),
-                            s.listener.is_some()
-                        ));
-                        ui.label(format!(
-                            "{} match and replace rules ({} enabled)",
-                            s.rules.len(),
-                            s.rules.iter().filter(|r| r.enabled).count()
-                        ));
-                    }
-                    2 => {
-                        theme::heading(ui, "Connections");
-                        ui.label("Timeouts: 30 seconds for connect and read.");
-                        ui.label("Upstream TLS: certificates are not verified (testing proxy).");
-                    }
-                    _ => {
-                        theme::heading(ui, "Session handling rules");
-                        ui.label(RichText::new("No session handling rules.").color(theme::muted()));
                     }
                 });
+            egui::CentralPanel::default().show(ui, |ui| match self.section {
+                0 => {
+                    theme::heading(ui, "Appearance");
+                    ui.horizontal(|ui| {
+                        ui.label("Theme:");
+                        changed |= ui.radio_value(&mut self.dark, false, "Light").changed();
+                        changed |= ui.radio_value(&mut self.dark, true, "Dark").changed();
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Font size:");
+                        changed |= ui
+                            .add(egui::Slider::new(&mut self.font_size, 10.0..=20.0).step_by(1.0))
+                            .changed();
+                    });
+                    ui.add_space(8.0);
+                    theme::heading(ui, "Hotkeys");
+                    egui::Grid::new("hotkeys").striped(true).show(ui, |ui| {
+                        for (a, k) in [
+                            ("Send to Repeater", "Ctrl+R"),
+                            ("Send to Intruder", "Ctrl+I"),
+                            ("Issue Repeater request", "Ctrl+Space"),
+                            ("Forward intercepted message", "Ctrl+F"),
+                            ("Toggle intercept", "Ctrl+T"),
+                            (
+                                "Switch to Dashboard / Target / Proxy / Intruder / Repeater",
+                                "Ctrl+Shift+D / T / P / I / R",
+                            ),
+                        ] {
+                            ui.label(a);
+                            ui.monospace(k);
+                            ui.end_row();
+                        }
+                    });
+                }
+                1 => {
+                    let s = state.lock().unwrap();
+                    theme::heading(ui, "Proxy listeners");
+                    ui.label(format!(
+                        "127.0.0.1:{} (running: {})",
+                        s.listener.unwrap_or(8080),
+                        s.listener.is_some()
+                    ));
+                    ui.label(format!(
+                        "{} match and replace rules ({} enabled)",
+                        s.rules.len(),
+                        s.rules.iter().filter(|r| r.enabled).count()
+                    ));
+                }
+                2 => {
+                    theme::heading(ui, "Connections");
+                    ui.label("Timeouts: 30 seconds for connect and read.");
+                    ui.label("Upstream TLS: certificates are not verified (testing proxy).");
+                }
+                _ => {
+                    theme::heading(ui, "Session handling rules");
+                    ui.label(RichText::new("No session handling rules.").color(theme::muted()));
+                }
             });
+        });
         self.open = open;
         changed
     }
