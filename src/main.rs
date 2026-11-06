@@ -147,12 +147,16 @@ impl App {
             }
         };
         if let Some(ca) = &ca {
-            // BURPCRAFT_PROXY=port moves the listener off 8080
-            let port = std::env::var("BURPCRAFT_PROXY")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(8080);
-            proxy::start(state.clone(), ca.clone(), port);
+            // BURPCRAFT_PROXY=port moves the listener off 8080 (0 = any free port)
+            match std::env::var("BURPCRAFT_PROXY").map(|v| (v.parse::<u16>(), v)) {
+                Err(_) => proxy::start(state.clone(), ca.clone(), 8080),
+                Ok((Ok(port), _)) => proxy::start(state.clone(), ca.clone(), port),
+                // not 8080: the user set the variable to stay off it
+                Ok((Err(_), v)) => state.lock().unwrap().event(
+                    "Proxy",
+                    format!("Proxy not started: BURPCRAFT_PROXY={v:?} is not a port number"),
+                ),
+            }
         }
         // dev hooks: BURPCRAFT_TAB / BURPCRAFT_PROXY_TAB pick the start screen (used with BURPCRAFT_SHOT)
         let pick = |var: &str, list: &[&'static str], def: &'static str| {
