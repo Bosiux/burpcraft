@@ -669,6 +669,7 @@ impl Tab {
             }
             ui.label(RichText::new(&self.bcheck_msg).color(theme::muted()));
         });
+        ui.label(RichText::new("Syntax: metadata, optional `run for each:` (name = \"a\", \"b\") and `define:` (name = \"value\", used as {name}; {random_str(8)}), `given ... then`, `send ...`, `if ... then` / `else if ... then` / `else` / `end if`, `report issue:`. New starts from an example.").color(theme::muted()));
         egui::ScrollArea::vertical().show(ui, |ui| {
             ui.add(
                 egui::TextEdit::multiline(&mut self.bcheck_text)
