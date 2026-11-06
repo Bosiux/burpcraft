@@ -61,8 +61,8 @@ const TOOLS: &[(&str, &str, &str)] = &[
     ),
     (
         "intruder",
-        "Run an attack synchronously. Mark positions with §value§. attack: sniper (default), battering_ram, pitchfork, cluster_bomb. payloads: one list per position (sniper/battering_ram use the first). Max 1000 requests. Returns status/length/ms per request and grep match.",
-        r#"{"type":"object","properties":{"request":{"type":"string"},"target":{"type":"string"},"attack":{"enum":["sniper","battering_ram","pitchfork","cluster_bomb"]},"payloads":{"type":"array","items":{"type":"array","items":{"type":"string"}}},"threads":{"type":"integer","description":"default 8"},"grep":{"type":"string","description":"regex; first match per response"}},"required":["request","payloads"]}"#,
+        "Run an attack synchronously. Mark positions with §value§. attack: sniper (default), battering_ram, pitchfork, cluster_bomb. payloads: one list per position (sniper/battering_ram use the first). Max 1000 requests. Returns status/length/ms per request and grep match. anomalies=true returns only the odd rows (error, status or length unlike the commonest response, ms > 3x median and >= 100 ms over it, grep match), each with `reasons`, plus total and baseline.",
+        r#"{"type":"object","properties":{"request":{"type":"string"},"target":{"type":"string"},"attack":{"enum":["sniper","battering_ram","pitchfork","cluster_bomb"]},"payloads":{"type":"array","items":{"type":"array","items":{"type":"string"}}},"threads":{"type":"integer","description":"default 8"},"grep":{"type":"string","description":"regex; first match per response"},"anomalies":{"type":"boolean","description":"only anomalous rows, default false"}},"required":["request","payloads"]}"#,
     ),
     (
         "intercept",
@@ -552,9 +552,7 @@ fn call(name: &str, a: &J, ctx: &Ctx) -> Result<J, String> {
             if let Some(b) = bool_arg(a, "enabled") {
                 st.intercept = b;
                 if !b {
-                    for p in st.queue.drain(..) {
-                        let _ = p.reply.send(Some(p.req));
-                    }
+                    st.forward_all();
                 }
             }
             if !matches!(a, J::Obj(v) if v.is_empty()) {
@@ -922,7 +920,78 @@ fn intruder_attack(a: &J, ctx: &Ctx, grep: Option<regex::Regex>) -> Result<J, St
     });
     let mut rows = rows.into_inner().unwrap();
     rows.sort_by_key(|r| r.0);
-    Ok(J::Arr(rows.into_iter().map(|r| r.1).collect()))
+    let rows: Vec<J> = rows.into_iter().map(|r| r.1).collect();
+    Ok(if bool_arg(a, "anomalies") == Some(true) {
+        anomalies(rows)
+    } else {
+        J::Arr(rows)
+    })
+}
+
+/// Only the odd intruder rows. Baseline = the commonest (status, length) among rows without `error`;
+/// length matches within the `soft_404` tolerance (exact, or 2% above 200 bytes). A row is anomalous
+/// for `error`, `status`, `length`, `time` (ms > 3x median and >= 100 ms over it) or `grep` (match set).
+fn anomalies(rows: Vec<J>) -> J {
+    fn nu(r: &J, k: &str) -> i64 {
+        num_arg(r, k).unwrap_or(0)
+    }
+    let compat = |a: i64, b: i64| b == a || (a > 200 && a.abs_diff(b) <= (a / 50) as u64);
+    let ok: Vec<&J> = rows.iter().filter(|r| r.get("error").is_none()).collect();
+    // ponytail: O(n^2) baseline search, fine for the 1000-request cap; bucket by status if the cap grows
+    let mut base: Option<(i64, i64, usize)> = None;
+    for r in &ok {
+        let (st, len) = (nu(r, "status"), nu(r, "length"));
+        let c = ok
+            .iter()
+            .filter(|o| nu(o, "status") == st && compat(len, nu(o, "length")))
+            .count();
+        if base.is_none_or(|(_, _, bc)| c > bc) {
+            base = Some((st, len, c));
+        }
+    }
+    let mut ms: Vec<i64> = ok.iter().map(|r| nu(r, "ms")).collect();
+    ms.sort_unstable();
+    let med = ms.get(ms.len() / 2).copied().unwrap_or(0);
+    let mut out = vec![];
+    for r in &rows {
+        let mut why = vec![];
+        if r.get("error").is_some() {
+            why.push("error");
+        } else if let Some((bs, bl, _)) = base {
+            if nu(r, "status") != bs {
+                why.push("status");
+            }
+            if !compat(bl, nu(r, "length")) {
+                why.push("length");
+            }
+            let t = nu(r, "ms");
+            if t > 3 * med && t - med >= 100 {
+                why.push("time");
+            }
+            if !matches!(r.get("match"), None | Some(J::Null)) {
+                why.push("grep");
+            }
+        }
+        if let (false, J::Obj(mut v)) = (why.is_empty(), r.clone()) {
+            v.push(("reasons".into(), J::Arr(why.into_iter().map(s).collect())));
+            out.push(J::Obj(v));
+        }
+    }
+    obj(vec![
+        ("total", n(rows.len())),
+        (
+            "baseline",
+            base.map_or(J::Null, |(st, len, c)| {
+                obj(vec![
+                    ("status", n(st)),
+                    ("length", n(len)),
+                    ("count", n(c)),
+                    ("median_ms", n(med)),
+                ])
+            }),
+        ),
+        ("anomalies", J::Arr(out)),
+    ])
 }
 
 #[cfg(test)]
@@ -1063,6 +1132,170 @@ mod tests {
             .collect();
         assert_eq!(m, ["/a", "/b", "/c"].map(|x| J::Str(x.into())));
         assert!(tool(&c, "send", r#"{"request":"GET / HTTP/1.1\n\n"}"#).1); // no Host, no target
+    }
+
+    fn row(status: u16, length: usize, ms: u64, m: Option<&str>) -> J {
+        obj(vec![
+            ("payloads", J::Arr(vec![s("p")])),
+            ("status", n(status)),
+            ("length", n(length)),
+            ("ms", n(ms)),
+            ("match", m.map_or(J::Null, s)),
+        ])
+    }
+
+    fn err_row() -> J {
+        obj(vec![
+            ("payloads", J::Arr(vec![s("p")])),
+            ("error", s("boom")),
+        ])
+    }
+
+    fn reasons(out: &J) -> Vec<Vec<String>> {
+        let Some(J::Arr(a)) = out.get("anomalies") else {
+            panic!("{out:?}")
+        };
+        a.iter().map(|r| strs(r.get("reasons").unwrap())).collect()
+    }
+
+    fn why(r: &[&str]) -> Vec<String> {
+        r.iter().map(|x| x.to_string()).collect()
+    }
+
+    #[test]
+    fn anomalies_filter() {
+        // every reason, the error row, baseline ties resolved by the first row
+        let out = anomalies(vec![
+            row(200, 1000, 10, None),
+            row(200, 1000, 10, None),
+            row(200, 1000, 10, None),
+            row(404, 1000, 10, None),
+            row(200, 2000, 10, None),
+            row(200, 1000, 10, Some("x")),
+            err_row(),
+            row(200, 1000, 500, None),
+            row(500, 5000, 10, None),
+        ]);
+        assert_eq!(out.get("total"), Some(&n(9)));
+        let b = out.get("baseline").unwrap();
+        assert_eq!(b.get("status"), Some(&n(200)));
+        assert_eq!(b.get("length"), Some(&n(1000)));
+        assert_eq!(b.get("count"), Some(&n(5)));
+        assert_eq!(b.get("median_ms"), Some(&n(10)));
+        assert_eq!(
+            reasons(&out),
+            vec![
+                why(&["status"]),
+                why(&["length"]),
+                why(&["grep"]),
+                why(&["error"]),
+                why(&["time"]),
+                why(&["status", "length"]),
+            ]
+        );
+        // original fields are kept, in original order
+        let J::Arr(a) = out.get("anomalies").unwrap() else {
+            panic!()
+        };
+        assert_eq!(a[0].get("status"), Some(&n(404)));
+        assert_eq!(a[2].get("match"), Some(&s("x")));
+        assert_eq!(a[3].get("error"), Some(&s("boom")));
+
+        // 2% tolerance above 200 bytes: 1029 is within 21 of 1050, 1028 is not
+        let out = anomalies(vec![
+            row(200, 1050, 10, None),
+            row(200, 1050, 10, None),
+            row(200, 1050, 10, None),
+            row(200, 1029, 10, None),
+            row(200, 1028, 10, None),
+        ]);
+        assert_eq!(out.get("baseline").unwrap().get("count"), Some(&n(4)));
+        assert_eq!(reasons(&out), vec![why(&["length"])]);
+        // small responses must match exactly
+        let out = anomalies(vec![row(200, 100, 1, None), row(200, 101, 1, None)]);
+        assert_eq!(reasons(&out), vec![why(&["length"])]);
+
+        // time: strictly above 3x median AND at least 100 ms over it
+        let out = anomalies(vec![
+            row(200, 10, 10, None),
+            row(200, 10, 10, None),
+            row(200, 10, 10, None),
+            row(200, 10, 109, None),
+            row(200, 10, 110, None),
+        ]);
+        assert_eq!(reasons(&out), vec![why(&["time"])]);
+        assert_eq!(
+            out.get("anomalies").and_then(|a| match a {
+                J::Arr(v) => v[0].get("ms").cloned(),
+                _ => None,
+            }),
+            Some(n(110))
+        );
+        let out = anomalies(vec![
+            row(200, 10, 100, None),
+            row(200, 10, 100, None),
+            row(200, 10, 100, None),
+            row(200, 10, 300, None),
+            row(200, 10, 301, None),
+        ]);
+        assert_eq!(reasons(&out), vec![why(&["time"])]);
+
+        // all rows failed: no baseline, everything is anomalous
+        let out = anomalies(vec![err_row(), err_row()]);
+        assert_eq!(out.get("total"), Some(&n(2)));
+        assert_eq!(out.get("baseline"), Some(&J::Null));
+        assert_eq!(reasons(&out), vec![why(&["error"]), why(&["error"])]);
+    }
+
+    #[test]
+    fn intruder_anomalies_option() {
+        let c = ctx();
+        let port = echo_server();
+        let args = |extra: &str| {
+            format!(
+                r#"{{"request":"GET /§x§ HTTP/1.1\nHost: x\n\n","target":"http://127.0.0.1:{port}","payloads":[["a","b","c","long-payload"]]{extra}}}"#
+            )
+        };
+        let (r, err) = tool(&c, "intruder", &args(r#","anomalies":true"#));
+        assert!(!err, "{r:?}");
+        assert_eq!(r.get("total"), Some(&n(4)));
+        assert_eq!(r.get("baseline").unwrap().get("count"), Some(&n(3)));
+        assert_eq!(reasons(&r), vec![why(&["length"])]);
+        let J::Arr(a) = r.get("anomalies").unwrap() else {
+            panic!()
+        };
+        assert_eq!(a.len(), 1);
+        assert_eq!(a[0].get("payloads"), Some(&J::Arr(vec![s("long-payload")])));
+        // off by default: the plain row list
+        let (r, _) = tool(&c, "intruder", &args(""));
+        assert!(matches!(r, J::Arr(v) if v.len() == 4));
+    }
+
+    #[test]
+    fn forward_all_releases_queue() {
+        let c = ctx();
+        let mut held = Vec::new();
+        for (id, req) in [
+            (1, b"GET /a HTTP/1.1\r\n\r\n".to_vec()),
+            (2, b"GET /b HTTP/1.1\r\n\r\n".to_vec()),
+        ] {
+            let (tx, rx) = std::sync::mpsc::channel();
+            c.state.lock().unwrap().queue.push_back(proxy::Pending {
+                id,
+                host: "h".into(),
+                port: 80,
+                tls: false,
+                req: req.clone(),
+                response: false,
+                reply: tx,
+            });
+            held.push((rx, req));
+        }
+        c.state.lock().unwrap().forward_all();
+        for (rx, req) in held {
+            assert_eq!(rx.recv().unwrap().unwrap(), req);
+        }
+        assert!(c.state.lock().unwrap().queue.is_empty());
     }
 
     #[test]

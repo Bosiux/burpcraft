@@ -401,6 +401,12 @@ impl Shared {
             ui_cmds: Vec::new(),
         }))
     }
+    /// Releases every held message unchanged.
+    pub fn forward_all(&mut self) {
+        for p in self.queue.drain(..) {
+            let _ = p.reply.send(Some(p.req));
+        }
+    }
     pub fn event(&mut self, source: &str, msg: impl Into<String>) {
         self.events.push((now(), source.into(), msg.into()));
         self.repaint();

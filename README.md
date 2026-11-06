@@ -73,6 +73,7 @@ flowchart LR
 
 ```sh
 cargo run --release                     # starts the app; the proxy listens on 127.0.0.1:8080
+BURPCRAFT_PROXY=8090 cargo run --release   # another proxy port
 cargo run --release -- my.burpcraft     # open or create a project file
 BURPCRAFT_API=1337 cargo run --release  # also start the REST API on 127.0.0.1:1337
 ```
@@ -112,7 +113,7 @@ claude mcp add --transport http burpcraft http://127.0.0.1:1338/mcp   # + --head
 | `history_list` / `history_get` | proxy or logger items: filter (host, method, status, regex, `after_id`), full request/response |
 | `ws_list` | WebSocket messages |
 | `send` | raw HTTP/1.1 or HTTP/2 request → response (Repeater) |
-| `intruder` | `§`-marked attack: sniper, battering_ram, pitchfork, cluster_bomb; grep per response |
+| `intruder` | `§`-marked attack: sniper, battering_ram, pitchfork, cluster_bomb; grep per response; `anomalies` returns only the odd rows |
 | `intercept` · `intercept_queue` · `intercept_forward` · `intercept_drop` | MITM: hold, read, edit-and-forward or drop live requests/responses |
 | `rules` · `scope` | match-and-replace rules, target scope (get, or replace with `set`) |
 | `scan_start` · `scan_status` · `issues` | active scan of URLs or one request, progress, findings |
