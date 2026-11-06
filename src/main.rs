@@ -2036,7 +2036,7 @@ impl eframe::App for App {
                     .inner_margin(egui::Margin::symmetric(6, 0)),
             )
             .show(ui, |ui| self.main_tabs(ui));
-        update::banner(ui, &mut self.update_dismissed);
+        update::popup(ui.ctx(), &mut self.update_dismissed);
         self.intruder.windows(ui.ctx());
         self.project_window(ui.ctx());
         self.search_window(ui.ctx());

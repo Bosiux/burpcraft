@@ -185,34 +185,43 @@ fn unix_now() -> u64 {
         .map_or(0, |d| d.as_secs())
 }
 
-/// Banner under the tab bar while a newer release is pending; `dismissed` hides it until restart.
-pub fn banner(ui: &mut egui::Ui, dismissed: &mut bool) {
+/// Popup in the bottom-right corner while a newer release is pending; `dismissed` hides it until restart.
+pub fn popup(ctx: &egui::Context, dismissed: &mut bool) {
     let Some(tag) = prefs().lock().unwrap().pending().map(str::to_string) else {
         return;
     };
     if *dismissed {
         return;
     }
-    egui::Panel::top("update_banner")
-        .frame(theme::frame_chrome())
-        .show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.label(RichText::new(format!(
-                    "BurpCraft {} is available (you have {CURRENT}).",
-                    tag.trim_start_matches('v')
-                )));
-                if ui.button("Release notes").clicked() {
-                    let _ = crate::misc::open_external(format!(
-                        "https://github.com/{REPO}/releases/tag/{tag}"
+    // an Area, not theme::window: it must stay inside the main window
+    egui::Area::new(egui::Id::unique("update_popup"))
+        .order(egui::Order::Foreground)
+        .anchor(egui::Align2::RIGHT_BOTTOM, [-12.0, -12.0])
+        .show(ctx, |ui| {
+            egui::Frame::popup(ui.style())
+                .stroke(egui::Stroke::new(1.0, theme::ORANGE))
+                .inner_margin(12)
+                .show(ui, |ui| {
+                    theme::heading(ui, "Update available");
+                    ui.label(format!(
+                        "BurpCraft {} is available. You have {CURRENT}.",
+                        tag.trim_start_matches('v')
                     ));
-                }
-                if ui.button("Skip this version").clicked() {
-                    update_prefs(|p| p.skipped = tag.clone());
-                }
-                if ui.button("Later").clicked() {
-                    *dismissed = true;
-                }
-            });
+                    ui.add_space(6.0);
+                    ui.horizontal(|ui| {
+                        if theme::primary_button(ui, "Release notes").clicked() {
+                            let _ = crate::misc::open_external(format!(
+                                "https://github.com/{REPO}/releases/tag/{tag}"
+                            ));
+                        }
+                        if ui.button("Skip this version").clicked() {
+                            update_prefs(|p| p.skipped = tag.clone());
+                        }
+                        if ui.button("Later").clicked() {
+                            *dismissed = true;
+                        }
+                    });
+                });
         });
 }
 

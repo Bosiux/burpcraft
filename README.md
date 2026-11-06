@@ -136,7 +136,7 @@ See [ROADMAP.md](ROADMAP.md) for what is done and what is not covered yet.
 Downloads for macOS (universal `.dmg`), Windows (`.zip`) and Linux x86_64/aarch64 (`.tar.gz`) are on the
 [Releases](../../releases) page, with `SHA256SUMS.txt` and build provenance (`gh attestation verify <file> -R Bosiux/burpcraft`).
 
-Once a day at startup the app asks the GitHub Releases API whether a newer version exists and shows a banner; it
+Once a day at startup the app asks the GitHub Releases API whether a newer version exists and shows a popup; it
 never downloads or installs anything and sends nothing beyond that request. Beta builds also see betas. Turn it off in
 *Settings → User interface → Updates*, or set `BURPCRAFT_NO_UPDATE_CHECK=1`.
 
