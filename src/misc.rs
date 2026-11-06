@@ -232,6 +232,8 @@ impl Settings {
                             .changed();
                     });
                     ui.add_space(8.0);
+                    crate::update::settings(ui);
+                    ui.add_space(8.0);
                     theme::heading(ui, "Hotkeys");
                     egui::Grid::new("hotkeys").striped(true).show(ui, |ui| {
                         for (a, k) in [

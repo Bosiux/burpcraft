@@ -136,6 +136,10 @@ See [ROADMAP.md](ROADMAP.md) for what is done and what is not covered yet.
 Downloads for macOS (universal `.dmg`), Windows (`.zip`) and Linux x86_64/aarch64 (`.tar.gz`) are on the
 [Releases](../../releases) page, with `SHA256SUMS.txt` and build provenance (`gh attestation verify <file> -R Bosiux/burpcraft`).
 
+Once a day at startup the app asks the GitHub Releases API whether a newer version exists and shows a banner; it
+never downloads or installs anything and sends nothing beyond that request. Beta builds also see betas. Turn it off in
+*Settings → User interface → Updates*, or set `BURPCRAFT_NO_UPDATE_CHECK=1`.
+
 - **Stable**: bump `version` in `Cargo.toml`, merge to `main`, then `git tag vX.Y.Z && git push origin vX.Y.Z`.
 - **Beta**: *Actions → Release → Run workflow* on any branch publishes `vX.Y.Z-beta.N` as a pre-release (never `latest`).
 

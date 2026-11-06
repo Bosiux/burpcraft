@@ -28,6 +28,7 @@ mod sequencer;
 mod target;
 mod theme;
 mod tools;
+mod update;
 
 use std::sync::Arc;
 
@@ -97,6 +98,7 @@ struct App {
     ws_sel: Option<usize>,
     issue_sel: Option<usize>,
     flash: Option<&'static str>,
+    update_dismissed: bool,
     comment_edit: Option<(usize, String)>,
     frames: u32,
     /// Open project file: Ctrl+S and exit save here.
@@ -166,6 +168,7 @@ impl App {
             app.native_menu = Some(macmenu::NativeMenu::new(&cc.egui_ctx));
         }
         ext::init(app.state.clone());
+        update::start(cc.egui_ctx.clone());
         // BURPCRAFT_API=port[:key] starts the REST API (e.g. for CI)
         if let Ok(v) = std::env::var("BURPCRAFT_API") {
             let (port, key) = v.split_once(':').unwrap_or((&v, ""));
@@ -217,6 +220,7 @@ impl App {
             ws_sel: None,
             issue_sel: None,
             flash: None,
+            update_dismissed: false,
             comment_edit: None,
             frames: 0,
             project: None,
@@ -2032,6 +2036,7 @@ impl eframe::App for App {
                     .inner_margin(egui::Margin::symmetric(6, 0)),
             )
             .show(ui, |ui| self.main_tabs(ui));
+        update::banner(ui, &mut self.update_dismissed);
         self.intruder.windows(ui.ctx());
         self.project_window(ui.ctx());
         self.search_window(ui.ctx());
