@@ -56,6 +56,7 @@ into `<OUT>.png` with sample traffic (uses the BURPCRAFT_SHOT / BURPCRAFT_TAB de
 - [ ] Scanner: Target scope is not applied (a scan stays on the origins it is given; the crawler is same-origin); delay/rate limit only in the New scan dialog, not over REST/MCP
 - [ ] REST API `/v0.1/scan`: no API definition, authentication, threads or delay fields (MCP `scan_start` has openapi/headers/login)
 - [ ] HTTP client buffers whole bodies in memory (no size cap on a real multi-GB response)
+- [ ] e2e_scan.py: OpenAPI **YAML** import is not exercised end to end - the scanner parses YAML (`openapi::parse_yaml`) but only the GUI New-scan file dialog uses it; the REST/MCP `openapi` argument is JSON-only (`openapi::parse`), so YAML can't be driven headlessly. The request-smuggling **positive** (a raw CL.TE/TE.CL front end that hangs) is opt-in via `E2E_SMUGGLE=1` because each timing probe waits out a 10 s hang; the default run only asserts the check doesn't false-positive on the well-behaved app
 
 ## Done (iteration 4): Pro features
 Everything in the table below is implemented; see the per-row notes. Self-hosting:
