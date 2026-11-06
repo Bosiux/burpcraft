@@ -1,7 +1,7 @@
 //! HTTP message editor (Pretty / Raw / Hex) with syntax colouring, and the Inspector side panel.
 use eframe::egui::{self, Color32, FontId, RichText, TextFormat, text::LayoutJob};
 
-use crate::codec;
+use crate::http::codec;
 use crate::theme;
 
 #[derive(Clone, Copy, PartialEq, Default)]
@@ -407,7 +407,7 @@ pub fn inspector(ui: &mut egui::Ui, req: &str, resp: Option<&str>) {
                 kv_grid(ui, "query", &query)
             });
             let body = req.split_once("\r\n\r\n").map(|(_, b)| b).unwrap_or("");
-            let ct = crate::net::header(req, "content-type").unwrap_or_default();
+            let ct = crate::http::net::header(req, "content-type").unwrap_or_default();
             let bparams = if ct.contains("x-www-form-urlencoded") {
                 split_params(body, '&')
             } else {
@@ -416,7 +416,7 @@ pub fn inspector(ui: &mut egui::Ui, req: &str, resp: Option<&str>) {
             section(ui, "Request body parameters", bparams.len(), |ui| {
                 kv_grid(ui, "body", &bparams)
             });
-            let cookies: Vec<(String, String)> = crate::net::header(req, "cookie")
+            let cookies: Vec<(String, String)> = crate::http::net::header(req, "cookie")
                 .map(|c| split_params(&c.replace("; ", ";"), ';'))
                 .unwrap_or_default();
             section(ui, "Request cookies", cookies.len(), |ui| {

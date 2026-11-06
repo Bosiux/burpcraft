@@ -333,12 +333,12 @@ pub fn requests(doc: &J, base: Option<&str>) -> Result<Vec<(Target, String)>, St
                     "path" => {
                         p = p.replace(
                             &format!("{{{name}}}"),
-                            &crate::codec::url_encode(scalar(&v).as_bytes(), false),
+                            &crate::http::codec::url_encode(scalar(&v).as_bytes(), false),
                         )
                     }
                     "query" => query.push(format!(
                         "{name}={}",
-                        crate::codec::url_encode(scalar(&v).as_bytes(), false)
+                        crate::http::codec::url_encode(scalar(&v).as_bytes(), false)
                     )),
                     "header" => headers += &format!("{name}: {}\r\n", scalar(&v)),
                     "body" => (body, ctype) = (v.to_json(), "application/json"),
@@ -346,7 +346,7 @@ pub fn requests(doc: &J, base: Option<&str>) -> Result<Vec<(Target, String)>, St
                         body += &format!(
                             "{}{name}={}",
                             if body.is_empty() { "" } else { "&" },
-                            crate::codec::url_encode(scalar(&v).as_bytes(), false)
+                            crate::http::codec::url_encode(scalar(&v).as_bytes(), false)
                         );
                         ctype = "application/x-www-form-urlencoded";
                     }
@@ -381,7 +381,7 @@ pub fn requests(doc: &J, base: Option<&str>) -> Result<Vec<(Target, String)>, St
                         .map(|(k, v)| {
                             format!(
                                 "{k}={}",
-                                crate::codec::url_encode(scalar(v).as_bytes(), false)
+                                crate::http::codec::url_encode(scalar(v).as_bytes(), false)
                             )
                         })
                         .collect::<Vec<_>>()

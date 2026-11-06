@@ -50,7 +50,7 @@ impl Grep {
         if self.payloads {
             // payloads are sent URL-encoded; look for the decoded value
             let hit = payloads.iter().any(|p| {
-                let raw = String::from_utf8_lossy(&crate::codec::url_decode(p)).into_owned();
+                let raw = String::from_utf8_lossy(&crate::http::codec::url_decode(p)).into_owned();
                 !raw.is_empty() && resp.contains(&raw)
             });
             out.push(if hit { "Yes".into() } else { String::new() });

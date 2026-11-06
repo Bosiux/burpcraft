@@ -2,7 +2,7 @@
 use std::io::{self, BufReader};
 
 use super::*;
-use crate::net::Stream;
+use crate::http::net::Stream;
 
 #[derive(Clone)]
 pub struct WsMsg {

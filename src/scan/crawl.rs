@@ -23,7 +23,7 @@ pub fn links(base_path: &str, html: &str, t: &Target) -> (Vec<String>, Vec<Strin
         host_header(t)
     );
     let resolve = |u: &str| -> Option<String> {
-        let u = crate::codec::html_decode(u.trim());
+        let u = crate::http::codec::html_decode(u.trim());
         if let Some(rest) = u.strip_prefix(&origin) {
             return Some(if rest.is_empty() {
                 "/".into()
@@ -72,8 +72,8 @@ pub fn links(base_path: &str, html: &str, t: &Target) -> (Vec<String>, Vec<Strin
                     .unwrap_or_else(|| "test".into());
                 Some(format!(
                     "{}={}",
-                    crate::codec::url_encode(name.as_bytes(), false),
-                    crate::codec::url_encode(value.as_bytes(), false)
+                    crate::http::codec::url_encode(name.as_bytes(), false),
+                    crate::http::codec::url_encode(value.as_bytes(), false)
                 ))
             })
             .collect();
@@ -136,7 +136,7 @@ pub(crate) fn crawl(c: &Ctx, start: &str, status: &Mutex<String>) -> Vec<String>
         if path.contains('?') {
             audit.push(req);
         }
-        let ct = crate::net::header(&String::from_utf8_lossy(proxy::head(&resp)), "content-type")
+        let ct = crate::http::net::header(&String::from_utf8_lossy(proxy::head(&resp)), "content-type")
             .unwrap_or_default();
         if !ct.contains("html") {
             continue;

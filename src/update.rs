@@ -52,7 +52,7 @@ impl Prefs {
 }
 
 fn prefs_file() -> PathBuf {
-    crate::net::data_dir().join("update.txt")
+    crate::http::net::data_dir().join("update.txt")
 }
 
 fn prefs() -> &'static Mutex<Prefs> {
@@ -65,7 +65,7 @@ fn prefs() -> &'static Mutex<Prefs> {
 }
 
 fn save(p: &Prefs) {
-    let _ = std::fs::create_dir_all(crate::net::data_dir());
+    let _ = std::fs::create_dir_all(crate::http::net::data_dir());
     let _ = std::fs::write(prefs_file(), p.to_text());
 }
 
@@ -104,7 +104,7 @@ fn fetch_releases() -> Result<J, String> {
         "GET /repos/{REPO}/releases?per_page=20 HTTP/1.1\r\nHost: api.github.com\r\nUser-Agent: BurpCraft/{CURRENT}\r\nAccept: application/vnd.github+json\r\nX-GitHub-Api-Version: 2022-11-28\r\nConnection: close\r\n\r\n"
     );
     let resp =
-        crate::net::send_verified("api.github.com", req.as_bytes()).map_err(|e| e.to_string())?;
+        crate::http::net::send_verified("api.github.com", req.as_bytes()).map_err(|e| e.to_string())?;
     let head = String::from_utf8_lossy(crate::proxy::head(&resp)).into_owned();
     if head.split_whitespace().nth(1) != Some("200") {
         return Err(head.lines().next().unwrap_or_default().to_string());

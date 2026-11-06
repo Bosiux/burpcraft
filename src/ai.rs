@@ -128,7 +128,7 @@ fn call(body: &str, api_key: &str) -> Result<String, String> {
         "POST /v1/messages HTTP/1.1\r\nHost: api.anthropic.com\r\nContent-Type: application/json\r\nx-api-key: {api_key}\r\nanthropic-version: 2023-06-01\r\nanthropic-beta: server-side-fallback-2026-07-01\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
         body.len()
     );
-    let resp = crate::net::send_verified("api.anthropic.com", req.as_bytes())
+    let resp = crate::http::net::send_verified("api.anthropic.com", req.as_bytes())
         .map_err(|e| format!("Could not reach the Anthropic API: {e}"))?;
     let status = String::from_utf8_lossy(crate::proxy::head(&resp))
         .split_whitespace()

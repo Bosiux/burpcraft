@@ -568,9 +568,9 @@ pub fn image_bytes(src: &str) -> Option<Vec<u8>> {
     if let Some(rest) = src.strip_prefix("data:") {
         let (meta, data) = rest.split_once(',')?;
         return if meta.ends_with(";base64") {
-            crate::codec::base64_decode(data)
+            crate::http::codec::base64_decode(data)
         } else {
-            Some(crate::codec::url_decode(data))
+            Some(crate::http::codec::url_decode(data))
         };
     }
     if src.is_empty() {

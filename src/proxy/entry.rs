@@ -1,6 +1,6 @@
 //! The `Entry` record for one request/response exchange in history and the logger.
 use super::*;
-use crate::net;
+use crate::http::net;
 
 #[derive(Clone)]
 pub struct Entry {

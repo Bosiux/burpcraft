@@ -1,5 +1,5 @@
 //! Passive scanner: inspects traffic the proxy already captured (no extra requests) and reports issues.
-use crate::net;
+use crate::http::net;
 use crate::proxy::{self, Entry};
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord)]

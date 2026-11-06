@@ -126,7 +126,7 @@ impl Ctx {
             std::thread::sleep(Duration::from_millis(self.cfg.delay_ms));
         }
         let t0 = Instant::now();
-        let resp = crate::net::send(
+        let resp = crate::http::net::send(
             &self.target.host,
             self.target.port,
             self.target.tls,

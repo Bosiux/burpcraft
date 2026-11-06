@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicU16, Ordering};
 use std::sync::{Arc, mpsc};
 
 use super::*;
-use crate::net::{self, Ca, Stream};
+use crate::http::net::{self, Ca, Stream};
 
 static LISTEN_PORT: AtomicU16 = AtomicU16::new(0);
 
@@ -196,9 +196,9 @@ fn serve<S: Stream>(
             }
         } else {
             let use_h2 =
-                tls && state.lock().unwrap().http2 && !crate::h2up::known_unsupported(&host, port);
+                tls && state.lock().unwrap().http2 && !crate::http::h2up::known_unsupported(&host, port);
             let h2_req = if use_h2 {
-                crate::h2up::to_h2_text(&req)
+                crate::http::h2up::to_h2_text(&req)
             } else {
                 None
             };
@@ -211,7 +211,7 @@ fn serve<S: Stream>(
                     // history shows the HTTP/2 exchange; the browser side stays HTTP/1.1
                     req = h2_req.unwrap();
                     h2_resp = Some(apply_rules(&rules, &r, false));
-                    crate::h2up::to_h1_response(h2_resp.as_ref().unwrap(), method == "HEAD")
+                    crate::http::h2up::to_h1_response(h2_resp.as_ref().unwrap(), method == "HEAD")
                 }
                 Err(e) if e.kind() != io::ErrorKind::Unsupported => {
                     error_page(&format!("Error connecting to {host}:{port}: {e}"))
@@ -386,7 +386,7 @@ fn hold(
 pub fn error_page(msg: &str) -> Vec<u8> {
     let body = format!(
         "<html><head><title>BurpCraft Error</title></head><body><h1>BurpCraft Error</h1><p>{}</p></body></html>",
-        crate::codec::html_encode(msg.as_bytes(), false)
+        crate::http::codec::html_encode(msg.as_bytes(), false)
     );
     format!(
         "HTTP/1.1 502 Bad Gateway\r\nContent-Type: text/html; charset=utf-8\r\nConnection: close\r\nContent-Length: {}\r\n\r\n{body}",

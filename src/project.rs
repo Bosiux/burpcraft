@@ -403,7 +403,7 @@ pub fn autosave(app: &mut App, ctx: &egui::Context) {
 }
 
 pub fn default_path() -> std::path::PathBuf {
-    crate::net::data_dir()
+    crate::http::net::data_dir()
         .join("projects")
         .join("project.burpcraft")
 }

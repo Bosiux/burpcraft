@@ -177,10 +177,10 @@ pub fn process(rules: &[(usize, String, String)], v: &str) -> Option<String> {
             2 => regex::Regex::new(a)
                 .map(|re| re.replace_all(&v, b.as_str()).into_owned())
                 .unwrap_or(v),
-            3 => crate::codec::url_encode(v.as_bytes(), true),
-            4 => crate::codec::base64_encode(v.as_bytes()),
-            5 => crate::codec::html_encode(v.as_bytes(), false),
-            6 => crate::codec::hash(
+            3 => crate::http::codec::url_encode(v.as_bytes(), true),
+            4 => crate::http::codec::base64_encode(v.as_bytes()),
+            5 => crate::http::codec::html_encode(v.as_bytes(), false),
+            6 => crate::http::codec::hash(
                 if a.trim().is_empty() { "MD5" } else { a.trim() },
                 v.as_bytes(),
             ),

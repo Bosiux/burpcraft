@@ -266,7 +266,7 @@ fn audit_point(c: &Ctx, req: &str, p: &Point, base: &(Vec<u8>, Duration)) {
         let r = inject(req, p, pl);
         if let Some((resp, _)) = c.send(&r)
             && (300..400).contains(&proxy::status_of(&resp))
-            && crate::net::header(&String::from_utf8_lossy(proxy::head(&resp)), "location")
+            && crate::http::net::header(&String::from_utf8_lossy(proxy::head(&resp)), "location")
                 .is_some_and(|l| l.starts_with(pl) || l.starts_with("//burpcraft-redirect.example"))
         {
             c.report(

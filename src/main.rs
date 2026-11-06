@@ -2,19 +2,17 @@
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 mod ai;
 mod bcheck;
-mod codec;
 mod collab;
 mod domi;
 mod editor;
 mod engage;
 mod ext;
-mod h2up;
+mod http;
 mod intruder;
 #[cfg(target_os = "macos")]
 mod macmenu;
 mod mcp;
 mod misc;
-mod net;
 mod openapi;
 mod project;
 mod proxy;
@@ -36,6 +34,7 @@ use std::sync::Arc;
 
 use eframe::egui::{self, RichText};
 
+use http::net;
 use proxy::{Entry, State};
 use ui::HistFilter;
 

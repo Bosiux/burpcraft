@@ -457,7 +457,7 @@ impl BCheck {
 }
 
 pub fn dir() -> std::path::PathBuf {
-    crate::net::data_dir().join("bchecks")
+    crate::http::net::data_dir().join("bchecks")
 }
 
 /// Loaded checks (from ~/.burpcraft/bchecks/*.bcheck) with any parse errors.

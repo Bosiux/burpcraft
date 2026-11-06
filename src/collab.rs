@@ -120,9 +120,9 @@ pub fn poll() -> Result<usize, String> {
         .unwrap_or((server.clone(), 80));
     let req = format!(
         "GET /burpcraft/poll?biid={biid}&secret={} HTTP/1.1\r\nHost: {server}\r\nConnection: close\r\n\r\n",
-        crate::codec::url_encode(secret.as_bytes(), false)
+        crate::http::codec::url_encode(secret.as_bytes(), false)
     );
-    let resp = crate::net::send(&host, port, false, req.as_bytes())
+    let resp = crate::http::net::send(&host, port, false, req.as_bytes())
         .map_err(|e| format!("Poll failed: {e}"))?;
     let text = String::from_utf8_lossy(&resp);
     if !text.starts_with("HTTP/1.1 200") && !text.starts_with("HTTP/1.0 200") {
@@ -310,7 +310,7 @@ impl Tab {
         if let Some(it) = self.selected.and_then(|i| c.interactions.get(i)) {
             ui.strong(format!("{} interaction from {}", it.protocol, it.client_ip));
             let mut raw = if it.protocol == "DNS" {
-                crate::codec::hexdump_rows(&it.raw)
+                crate::http::codec::hexdump_rows(&it.raw)
                     .map(|(o, h, a)| format!("{o:08x}  {h}  {a}"))
                     .collect::<Vec<_>>()
                     .join("\n")
@@ -350,7 +350,7 @@ mod tests {
         };
         // the "target" fetches the payload URL
         let path = url.trim_start_matches("http://").split_once('/').unwrap().1;
-        crate::net::send(
+        crate::http::net::send(
             "127.0.0.1",
             srv.http_port,
             false,

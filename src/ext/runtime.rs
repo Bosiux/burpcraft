@@ -6,7 +6,7 @@ use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::{Arc, Mutex, OnceLock, mpsc};
 use std::time::Duration;
 
-use crate::codec::{base64_decode, base64_encode};
+use crate::http::codec::{base64_decode, base64_encode};
 use crate::openapi::{J, parse};
 use crate::proxy::{Entry, State};
 
@@ -34,7 +34,7 @@ fn state_cell() -> &'static Mutex<Option<State>> {
 }
 
 fn list_file() -> std::path::PathBuf {
-    crate::net::data_dir().join("extensions.txt")
+    crate::http::net::data_dir().join("extensions.txt")
 }
 
 pub(super) fn save_list() {
@@ -44,7 +44,7 @@ pub(super) fn save_list() {
         .iter()
         .map(|e| e.lock().unwrap().path.clone())
         .collect();
-    let _ = std::fs::create_dir_all(crate::net::data_dir());
+    let _ = std::fs::create_dir_all(crate::http::net::data_dir());
     let _ = std::fs::write(list_file(), paths.join("\n"));
 }
 

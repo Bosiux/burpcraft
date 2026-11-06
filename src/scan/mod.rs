@@ -328,7 +328,7 @@ mod tests {
                         all.split('&')
                             .find_map(|kv| kv.strip_prefix(&format!("{k}=")))
                             .map(|v| {
-                                String::from_utf8_lossy(&crate::codec::url_decode(
+                                String::from_utf8_lossy(&crate::http::codec::url_decode(
                                     &v.replace('+', " "),
                                 ))
                                 .into_owned()
@@ -340,7 +340,7 @@ mod tests {
                     let (status, headers, body) = match path {
                         "/" => html("<a href=\"/search?q=hi\">s</a> <a href='/item?id=1'>i</a> <a href=\"/file?name=a.txt\">f</a> <a href=\"/go?url=/home\">g</a> <a href=\"/tpl?name=x\">t</a> <a href=\"/fetch?u=http://x/\">fetch</a> <a href=\"/safe?q=1\">safe</a> <a href=\"/comment?c=hi\">add</a> <a href=\"/comments\">list</a> <img src=\"/logo.png\"> <a href=\"https://other.example/\">ext</a> <form method=post action=/login><input name=user><input type=password name=pass></form>".into()),
                         "/search" => html(format!("Results for {}", arg("q"))),
-                        "/safe" => html(format!("Results for {}", crate::codec::html_encode(arg("q").as_bytes(), false))),
+                        "/safe" => html(format!("Results for {}", crate::http::codec::html_encode(arg("q").as_bytes(), false))),
                         "/item" => {
                             let id = arg("id");
                             if id.contains('\'') {
@@ -387,7 +387,7 @@ mod tests {
                             })
                         }
                         "/.git/HEAD" => ("200 OK", vec![], "ref: refs/heads/main\n".into()),
-                        "/login" => html(format!("Welcome {}", crate::codec::html_encode(arg("user").as_bytes(), false))),
+                        "/login" => html(format!("Welcome {}", crate::http::codec::html_encode(arg("user").as_bytes(), false))),
                         _ => ("404 Not Found", vec![], "nope".into()),
                     };
                     let mut c = c;

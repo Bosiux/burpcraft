@@ -73,7 +73,7 @@ const SCRIPT: &str = r#"(() => {
 
 /// Writes the extension (fresh each time, so updates apply) and returns its directory.
 pub fn extension_dir() -> std::io::Result<std::path::PathBuf> {
-    let dir = crate::net::data_dir().join("dom-invader");
+    let dir = crate::http::net::data_dir().join("dom-invader");
     std::fs::create_dir_all(&dir)?;
     std::fs::write(dir.join("manifest.json"), MANIFEST)?;
     std::fs::write(
@@ -97,7 +97,7 @@ pub struct Finding {
 pub fn parse_findings(text: &str) -> Vec<Finding> {
     let json = if let Some(i) = text.find("data-bcdi=\"") {
         let rest = &text[i + 11..];
-        crate::codec::html_decode(&rest[..rest.find('"').unwrap_or(0)])
+        crate::http::codec::html_decode(&rest[..rest.find('"').unwrap_or(0)])
     } else {
         text.to_string()
     };
