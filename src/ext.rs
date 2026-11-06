@@ -721,7 +721,9 @@ for line in sys.stdin:
         }));
         start(&ext);
         registry().lock().unwrap().push(ext.clone());
-        for _ in 0..100 {
+        // the Windows CI runner can take several seconds to spawn python3 and complete the
+        // handshake; poll generously (breaks early on success, so it's only slow on real failure)
+        for _ in 0..400 {
             if !ext.lock().unwrap().hooks.is_empty() {
                 break;
             }
