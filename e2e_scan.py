@@ -112,6 +112,8 @@ def route(method, path, q, h, body):
         return html("Item: a red chair")
     if p == "/xss/query":
         return html("Results for " + (ESC(arg("q")) if safe else arg("q")))
+    if p == "/api/yaml":  # reflected XSS, reachable only via the YAML OpenAPI definition below
+        return html("q=" + (ESC(arg("q")) if safe else arg("q")))
     if p == "/xss/body":
         return html("Thanks for " + (ESC(arg("comment")) if safe else arg("comment")))
     if p == "/board":  # landing page for a focused stored-XSS crawl (form + rendered-comments link)
@@ -424,6 +426,22 @@ def run():
     check("OpenAPI", "XSS on /api/search (query from the definition)", found("/api/search", "Cross-site scripting (reflected)"))
     check("OpenAPI", "SQLi on /api/items (JSON body from the schema)", found("/api/items", "SQL injection"))
     check("OpenAPI", "/api/safe/search clean", not any(i["path"] == "/api/safe/search" and i["name"] in ACTIVE for i in issues()))
+
+    # 3b. OpenAPI definition in YAML (not JSON): /api/yaml is reachable only through this definition,
+    # so finding it there proves YAML import works end to end over MCP.
+    openapi_yaml = (
+        'openapi: "3.0.0"\n'
+        "info: {title: shop, version: \"1\"}\n"
+        f"servers:\n  - url: {BASE}\n"
+        "paths:\n"
+        "  /api/yaml:\n"
+        "    get:\n"
+        "      parameters:\n"
+        "        - name: q\n          in: query\n          schema: {type: string}\n"
+    )
+    tid = mcp("scan_start", openapi=openapi_yaml)["task_id"]
+    wait_scan_mcp(tid)
+    check("OpenAPI YAML", "XSS on /api/yaml (operation from a YAML definition)", found("/api/yaml", "Cross-site scripting (reflected)"))
 
     # 4. authenticated scans: recorded login (cookie) and extra header
     login = raw("POST", "/login", "Content-Type: application/x-www-form-urlencoded\n", "user=admin&pass=secret")

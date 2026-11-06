@@ -470,17 +470,23 @@ fn from_yaml(y: &yaml_rust2::Yaml, depth: usize) -> Result<J, String> {
     })
 }
 
+/// Parses a definition from text, choosing YAML or JSON by content (JSON starts with `{`).
+pub fn parse_any(text: &str) -> Result<J, String> {
+    if text.trim_start().starts_with('{') {
+        parse(text)
+    } else {
+        parse_yaml(text)
+    }
+}
+
 /// Loads a definition file: YAML by extension (.yaml/.yml) or when it does not start with `{`.
 pub fn load(path: &str, base: Option<&str>) -> Result<Vec<(Target, String)>, String> {
     let text = std::fs::read_to_string(path).map_err(|e| format!("{path}: {e}"))?;
     let lower = path.to_ascii_lowercase();
-    let doc = if lower.ends_with(".yaml")
-        || lower.ends_with(".yml")
-        || !text.trim_start().starts_with('{')
-    {
+    let doc = if lower.ends_with(".yaml") || lower.ends_with(".yml") {
         parse_yaml(&text)?
     } else {
-        parse(&text)?
+        parse_any(&text)?
     };
     requests(&doc, base)
 }
@@ -559,6 +565,19 @@ mod tests {
             9000
         );
         assert!(requests(&parse(r#"{"paths": {}}"#).unwrap(), None).is_err());
+    }
+
+    #[test]
+    fn parse_any_detects_format() {
+        // JSON starts with `{`; anything else is treated as YAML
+        assert_eq!(
+            parse_any(r#"{"a":1}"#).unwrap(),
+            parse_yaml("a: 1").unwrap()
+        );
+        assert_eq!(
+            parse_any("a: 1\nb: 2").unwrap(),
+            parse("{\"a\":1,\"b\":2}").unwrap()
+        );
     }
 
     #[test]

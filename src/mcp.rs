@@ -97,7 +97,7 @@ const TOOLS: &[(&str, &str, &str)] = &[
     (
         "scan_start",
         "Start an active scan in the background. Either urls (crawl + audit), one raw request + target (audit its parameters), or openapi (audit every operation; urls[0] overrides its server). headers/login authenticate every request. Returns task_id for scan_status.",
-        r#"{"type":"object","properties":{"urls":{"type":"array","items":{"type":"string"}},"request":{"type":"string"},"target":{"type":"string"},"openapi":{"type":"string","description":"OpenAPI 3 / Swagger 2 JSON text"},"headers":{"type":"string","description":"extra `Name: value` lines on every request"},"login":{"type":"string","description":"raw login request sent first; its cookies join every request"},"thorough":{"type":"boolean"},"crawl":{"type":"boolean","description":"default true"}}}"#,
+        r#"{"type":"object","properties":{"urls":{"type":"array","items":{"type":"string"}},"request":{"type":"string"},"target":{"type":"string"},"openapi":{"type":"string","description":"OpenAPI 3 / Swagger 2 definition, JSON or YAML text"},"headers":{"type":"string","description":"extra `Name: value` lines on every request"},"login":{"type":"string","description":"raw login request sent first; its cookies join every request"},"thorough":{"type":"boolean"},"crawl":{"type":"boolean","description":"default true"}}}"#,
     ),
     (
         "scan_status",
@@ -701,7 +701,10 @@ fn call(name: &str, a: &J, ctx: &Ctx) -> Result<J, String> {
             if let Some(doc) = str_arg(a, "openapi") {
                 // as in the New scan dialog: the URL is the API base, not a crawl start
                 let base = urls.first().cloned();
-                extra.extend(openapi::requests(&openapi::parse(doc)?, base.as_deref())?);
+                extra.extend(openapi::requests(
+                    &openapi::parse_any(doc)?,
+                    base.as_deref(),
+                )?);
                 urls.clear();
             }
             if urls.is_empty() && extra.is_empty() {
