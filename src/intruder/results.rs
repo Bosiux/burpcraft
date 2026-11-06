@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 use eframe::egui::{self, RichText};
 use egui_extras::{Column, TableBuilder};
 
-use crate::theme;
+use crate::ui::theme;
 
 use super::*;
 
@@ -217,7 +217,7 @@ impl Intruder {
                 });
                     drop(rows);
                     let (mut req, mut resp) = (req, resp);
-                    crate::editor::split(ui, ("ares_req", k), &mut req, false, &mut resp, None);
+                    crate::ui::editor::split(ui, ("ares_req", k), &mut req, false, &mut resp, None);
                 },
             );
             if !open {

@@ -146,7 +146,7 @@ impl App {
         }
         let mut open = true;
         let mut go = None;
-        crate::theme::window(ctx, "Search", [760.0, 480.0], &mut open, |ui| {
+        crate::ui::theme::window(ctx, "Search", [760.0, 480.0], &mut open, |ui| {
             let sr = &mut self.search;
             let mut run = false;
             ui.horizontal(|ui| {

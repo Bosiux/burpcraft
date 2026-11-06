@@ -3,7 +3,7 @@ use std::time::Instant;
 
 use eframe::egui::{self, RichText};
 
-use crate::{editor, http::net, proxy, theme};
+use crate::{ui::editor, http::net, proxy, ui::theme};
 
 pub struct RepeaterTab {
     pub name: String,
@@ -236,7 +236,7 @@ impl Repeater {
             t.target(),
             t.req.split_whitespace().nth(1).unwrap_or("/")
         );
-        crate::editor::split(
+        crate::ui::editor::split(
             ui,
             ("rep_req", t.name.as_str()),
             &mut t.req,

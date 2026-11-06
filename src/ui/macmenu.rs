@@ -1,6 +1,6 @@
 //! macOS keeps the application menu in the system menu bar at the top of the screen,
 //! so there it replaces the in-window egui menu that Windows and Linux use.
-use super::{Cmd, MAIN_TABS};
+use crate::{Cmd, MAIN_TABS};
 use eframe::egui;
 use muda::accelerator::{Accelerator, Code, Modifiers};
 use muda::{AboutMetadata, CheckMenuItem, Menu, MenuId, MenuItem, PredefinedMenuItem, Submenu};
@@ -192,7 +192,7 @@ impl NativeMenu {
 mod tests {
     #[test]
     fn ids_map_to_commands() {
-        use super::{Cmd, cmd};
+        use crate::{Cmd, cmd};
         assert!(matches!(cmd("save"), Some(Cmd::SaveProject)));
         assert!(matches!(cmd("tab:Proxy"), Some(Cmd::Tab("Proxy"))));
         assert!(cmd("tab:Nope").is_none() && cmd("bogus").is_none());

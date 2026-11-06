@@ -3,7 +3,7 @@ use eframe::egui::{self, RichText};
 
 use super::runtime::{load, registry, save_list, start, unload};
 use super::store::{BApp, install, store_list};
-use crate::theme;
+use crate::ui::theme;
 
 // ------------------------------------------------------------ UI
 

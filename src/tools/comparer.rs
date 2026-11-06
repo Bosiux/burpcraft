@@ -1,6 +1,6 @@
 use eframe::egui::{self, Color32, RichText};
 
-use crate::theme;
+use crate::ui::theme;
 
 #[derive(Default)]
 pub struct Comparer {

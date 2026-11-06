@@ -427,7 +427,7 @@ impl Engage {
             return;
         }
         let mut open = true;
-        crate::theme::window(ctx, "Engagement tools", [820.0, 520.0], &mut open, |ui| {
+        crate::ui::theme::window(ctx, "Engagement tools", [820.0, 520.0], &mut open, |ui| {
             ui.strong(&self.title);
             ui.separator();
             if let Some(d) = &self.discovery {

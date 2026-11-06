@@ -2,7 +2,7 @@
 use eframe::egui::{self, Color32, FontId, RichText, TextFormat, text::LayoutJob};
 
 use crate::http::codec;
-use crate::theme;
+use crate::ui::theme;
 
 #[derive(Clone, Copy, PartialEq, Default)]
 enum View {

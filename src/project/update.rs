@@ -7,7 +7,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use eframe::egui::{self, RichText};
 
 use crate::automation::openapi::J;
-use crate::theme;
+use crate::ui::theme;
 
 const REPO: &str = "Bosiux/burpcraft";
 const CHECK_EVERY: Duration = Duration::from_secs(24 * 3600);

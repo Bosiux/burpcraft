@@ -7,7 +7,7 @@ use burpcraft_server::{BIID_LEN, Interaction};
 use eframe::egui::{self, RichText};
 use egui_extras::{Column, TableBuilder};
 
-use crate::theme;
+use crate::ui::theme;
 
 pub struct Client {
     /// Polling address `host:port` of the server's HTTP listener.

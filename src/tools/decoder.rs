@@ -1,6 +1,6 @@
 use eframe::egui;
 
-use crate::{http::codec, editor, theme};
+use crate::{http::codec, ui::editor, ui::theme};
 
 const DECODE: [&str; 6] = ["URL", "HTML", "Base64", "ASCII hex", "Hex", "Gzip"];
 const ENCODE: [&str; 8] = [

@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use eframe::egui::{self, RichText};
 
 use crate::proxy::{Entry, State};
-use crate::theme;
+use crate::ui::theme;
 
 #[derive(Default)]
 struct Node(BTreeMap<String, Node>);
@@ -150,7 +150,7 @@ impl Target {
         {
             let mut req = String::from_utf8_lossy(&e.req).into_owned();
             let mut resp = crate::proxy::display(&e.resp);
-            crate::editor::split(
+            crate::ui::editor::split(
                 ui,
                 ("smreq", e.id),
                 &mut req,

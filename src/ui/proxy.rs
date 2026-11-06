@@ -4,7 +4,7 @@
 use eframe::egui::{self, RichText};
 use egui_extras::{Column, TableBuilder};
 
-use crate::{App, PROXY_TABS, http::codec, editor, http::net, open_browser, proxy, theme};
+use crate::{App, PROXY_TABS, http::codec, ui::editor, http::net, open_browser, proxy, ui::theme};
 
 impl App {
     pub(crate) fn proxy(&mut self, ui: &mut egui::Ui) {
