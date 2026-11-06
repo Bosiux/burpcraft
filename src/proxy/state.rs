@@ -97,7 +97,7 @@ impl Shared {
             .and_then(|s| s.parse().ok())
             .unwrap_or(0);
         let id = self.logger.len() + 1;
-        self.logger.push(Entry {
+        let e = Entry {
             id,
             host: host.into(),
             port,
@@ -114,8 +114,43 @@ impl Shared {
             comment: String::new(),
             highlight: None,
             tool,
-        });
+        };
+        // ponytail: passive checks run under the state lock; move them out if tool traffic gets heavy
+        let mut found = crate::security::scanner::passive(&e);
+        found.extend(crate::security::bcheck::passive(&e));
+        self.add_issues(found, Some(&e));
+        self.logger.push(e);
         self.repaint();
+    }
+    /// Records issues not yet reported (one per name/origin/path). Tool traffic is not in the
+    /// history, so `evidence` is added there (hidden from the Proxy view) for the issue to link to.
+    pub fn add_issues(
+        &mut self,
+        found: Vec<crate::security::scanner::Issue>,
+        evidence: Option<&Entry>,
+    ) {
+        let mut evidence_id = None;
+        for mut i in found {
+            if self
+                .issues
+                .iter()
+                .any(|x| x.name == i.name && x.origin == i.origin && x.path == i.path)
+            {
+                continue;
+            }
+            if let Some(e) = evidence {
+                if evidence_id.is_none() {
+                    let mut e = e.clone();
+                    e.id = self.next_id;
+                    self.next_id += 1;
+                    evidence_id = Some(e.id);
+                    self.history.push(e);
+                }
+                i.entry_id = evidence_id.unwrap();
+            }
+            i.id = self.issues.len() + 1;
+            self.issues.push(i);
+        }
     }
     pub(crate) fn repaint(&self) {
         if let Some(c) = &self.ctx {
