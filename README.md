@@ -50,7 +50,7 @@
 |---|---|
 | **Proxy** | HTTPS MITM with a local CA, intercept (requests and responses), match and replace, HTTP history with filters, WebSockets history, HTTP/2 upstream |
 | **Repeater / Intruder** | Tabs, HTTP/1 ↔ HTTP/2, § positions, four attack types, 7 payload types, payload processing rules, Grep match / extract / payloads |
-| **Scanner** | Passive checks on all traffic; active crawl and audit (SQLi, XSS, path traversal, SSTI, open redirect, header and command injection, SSRF via Collaborator); OpenAPI/Swagger import; authenticated scans; scheduled and live tasks |
+| **Scanner** | Passive checks on all traffic; active crawl and audit (SQLi, XSS, path traversal, SSTI, open redirect, header and command injection, SSRF via Collaborator); OpenAPI/Swagger import (JSON or YAML); authenticated scans; scheduled and live tasks |
 | **DOM Invader** | Browser extension that tracks a canary into DOM sinks and probes prototype pollution, headless or while you browse |
 | **Collaborator** | `burpcraft-server`: DNS, HTTP and SMTP interaction capture with a polling API, or a built-in local server for testing |
 | **Extensions** | Out-of-process plugins in any language (JSON lines over stdin/stdout), BChecks, and a BApp Store served by your own server |
@@ -116,7 +116,7 @@ claude mcp add --transport http burpcraft http://127.0.0.1:1338/mcp   # + --head
 | `intruder` | `§`-marked attack: sniper, battering_ram, pitchfork, cluster_bomb; grep per response; `anomalies` returns only the odd rows |
 | `intercept` · `intercept_queue` · `intercept_forward` · `intercept_drop` | MITM: hold, read, edit-and-forward or drop live requests/responses |
 | `rules` · `scope` | match-and-replace rules, target scope (get, or replace with `set`) |
-| `scan_start` · `scan_status` · `issues` | active scan of URLs or one request, progress, findings |
+| `scan_start` · `scan_status` · `issues` | active scan of URLs, one request or an OpenAPI definition (optionally authenticated), progress, findings |
 | `collaborator` | built-in or remote OAST server, payloads, interactions |
 | `codec` | base64 / url / html / hex, md5 / sha* |
 | `open_in` · `events` | show an item in a UI tool for the human, app event log |

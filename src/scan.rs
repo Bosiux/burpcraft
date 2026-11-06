@@ -151,7 +151,7 @@ pub fn inject(req: &str, p: &Point, value: &str) -> String {
 
 // ------------------------------------------------------------ configuration
 
-pub const CHECKS: [&str; 9] = [
+pub const CHECKS: [&str; 10] = [
     "SQL injection",
     "Cross-site scripting (reflected)",
     "OS command injection",
@@ -161,6 +161,7 @@ pub const CHECKS: [&str; 9] = [
     "HTTP response header injection",
     "Out-of-band interactions (Collaborator)",
     "Time-based checks (slow)",
+    "HTTP request smuggling (timing)",
 ];
 
 #[derive(Clone)]
@@ -179,7 +180,8 @@ pub struct Config {
 impl Config {
     pub fn fast() -> Self {
         let mut checks = [true; CHECKS.len()];
-        checks[8] = false;
+        checks[8] = false; // time-based checks (slow)
+        checks[9] = false; // request smuggling (slow, timing-based)
         Self {
             checks,
             crawl: true,
@@ -407,14 +409,31 @@ impl Ctx {
             };
             let req = get_request(&self.target, path).replacen("GET ", &format!("{method} "), 1);
             if let Some((resp, _)) = self.send(&req)
-                && b.holds(&crate::bcheck::Responses {
+                && let Some(m) = b.matched(&crate::bcheck::Responses {
                     latest: &resp,
                     base: None,
                 })
             {
                 let e = entry_of(&self.target, &req, &resp, "Scanner");
-                self.report_issue(b.issue(e.origin(), e.path().to_string(), 0), e);
+                self.report_issue(m.issue(e.origin(), e.path().to_string(), 0), e);
             }
+        }
+    }
+
+    /// Timing-based request smuggling (CL.TE / TE.CL), once per target.
+    fn host_smuggle(&self) {
+        if self.stop.load(Ordering::SeqCst) || !self.cfg.on("HTTP request smuggling (timing)") {
+            return;
+        }
+        if let Some(f) = crate::smuggle::detect(&self.target, Duration::from_secs(10)) {
+            self.report(
+                "HTTP request smuggling",
+                Severity::High,
+                "Tentative",
+                f.detail,
+                &f.req,
+                &[],
+            );
         }
     }
 }
@@ -452,6 +471,10 @@ fn advice(name: &str) -> (&'static str, &'static str) {
         "External service interaction" => (
             "The server made a network request (DNS/HTTP) to a domain supplied in the input, a sign of SSRF or blind injection.",
             "Do not fetch URLs or resolve hosts from input; if needed, use a strict allow-list and block internal addresses.",
+        ),
+        "HTTP request smuggling" => (
+            "A front-end and back-end server interpret request boundaries differently (Content-Length vs Transfer-Encoding), so part of one request can be treated as the start of the next, letting an attacker poison other users' requests.",
+            "Make the whole chain agree on request parsing: reject messages that carry both Content-Length and Transfer-Encoding, normalise framing at the front-end, and prefer HTTP/2 end to end.",
         ),
         _ => ("", ""),
     }
@@ -513,13 +536,13 @@ fn audit_point(c: &Ctx, req: &str, p: &Point, base: &(Vec<u8>, Duration)) {
         };
         let r = inject(req, p, &value);
         if let Some((resp, _)) = c.send(&r)
-            && b.holds(&crate::bcheck::Responses {
+            && let Some(m) = b.matched(&crate::bcheck::Responses {
                 latest: &resp,
                 base: Some(&base.0),
             })
         {
             let e = entry_of(&c.target, &r, &resp, "Scanner");
-            let mut issue = b.issue(e.origin(), e.path().to_string(), 0);
+            let mut issue = m.issue(e.origin(), e.path().to_string(), 0);
             issue.detail = format!("{} ({})", issue.detail, p.label());
             c.report_issue(issue, e);
         }
@@ -612,14 +635,14 @@ fn audit_point(c: &Ctx, req: &str, p: &Point, base: &(Vec<u8>, Duration)) {
         for pl in ["{{7*7191}}", "${7*7191}", "<%= 7*7191 %>", "#{7*7191}"] {
             let r = inject(req, p, pl);
             if let Some((resp, _)) = c.send(&r)
-                && body_text(&resp).contains("51337")
-                && !base_body.contains("51337")
+                && body_text(&resp).contains("50337") // 7*7191
+                && !base_body.contains("50337")
             {
                 c.report(
                     "Server-side template injection",
                     Severity::High,
                     "Firm",
-                    format!("The {lab} is evaluated by a template engine: `{pl}` produced 51337."),
+                    format!("The {lab} is evaluated by a template engine: `{pl}` produced 50337."),
                     &r,
                     &resp,
                 );
@@ -1006,6 +1029,7 @@ pub fn start(
         }
         for c in &ctxs {
             c.host_bchecks();
+            c.host_smuggle();
         }
         let total = work.len();
         let (next, work, shared) = (
@@ -1193,7 +1217,12 @@ mod tests {
                         }
                         "/file" => html(if arg("name").contains("etc/passwd") { "root:x:0:0:root:/root:/bin/bash".into() } else { "file contents".into() }),
                         "/go" => ("302 Found", vec![("Location", arg("url"))], String::new()),
-                        "/tpl" => html(format!("Hello {}", if arg("name").contains("{{7*7191}}") { "51337".into() } else { arg("name") })),
+                        "/tpl" => {
+                            // evaluates `{{a*b}}` like a real engine, so a wrong expected product fails
+                            let n = arg("name");
+                            let v = n.strip_prefix("{{").and_then(|e| e.strip_suffix("}}")).and_then(|e| e.split_once('*')).and_then(|(a, b)| Some(a.parse::<u64>().ok()? * b.parse::<u64>().ok()?));
+                            html(format!("Hello {}", v.map_or(n, |v| v.to_string())))
+                        }
                         "/fetch" => {
                             // SSRF: fetches http URLs given in `u`
                             if let Some(rest) = arg("u").strip_prefix("http://") {

@@ -1,6 +1,6 @@
 //! Render tab: lays out an HTML response natively in egui (block/inline flow, lists, tables, forms,
 //! inline colours), on a white page like a browser. Parsing is html5ever via `scraper`.
-// ponytail: no scripts, floats or positioning; the Chromium engine covers full fidelity
+// ponytail: no scripts and approximate flex/grid/float layout; the Chromium engine covers full fidelity
 use std::cell::RefCell;
 
 use eframe::egui::{
@@ -223,8 +223,116 @@ struct BoxCss {
     border: Option<(f32, Color32)>,
     radius: f32,
     display: String,
-    column: bool, // flex-direction: column
-    cols: usize,  // grid-template-columns track count
+    column: bool,  // flex-direction: column
+    grid: String,  // grid-template-columns, resolved against the width at layout time
+    gap: [f32; 2], // row, column
+    justify: String,
+    width: Option<Track>, // width / flex-basis
+    grow: f32,
+    float: String,
+}
+
+/// One column of a flex row, grid or float layout.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Track {
+    Px(f32),
+    Pct(f32),
+    Fr(f32),
+}
+
+/// A width track: px/em/rem, %, fr; anything else (auto, min-content…) is 1fr.
+fn track(v: &str, font: f32) -> Track {
+    let num = |s: &str| s.trim().parse::<f32>().ok();
+    if let Some(args) = v.strip_prefix("minmax(").and_then(|a| a.strip_suffix(')')) {
+        // ponytail: minmax keeps only its max (fr or fixed); the min is ignored
+        return track(args.rsplit(',').next().unwrap_or("1fr").trim(), font);
+    }
+    if let Some(n) = v.strip_suffix("fr").and_then(num) {
+        Track::Fr(n.max(0.0))
+    } else if let Some(n) = v.strip_suffix('%').and_then(num) {
+        Track::Pct(n)
+    } else {
+        css_len(v, font).map_or(Track::Fr(1.0), Track::Px)
+    }
+}
+
+/// grid-template-columns as tracks; repeat(auto-fill|auto-fit, minmax(Npx, …)) fits as many N px columns as `avail` holds.
+fn grid_tracks(v: &str, font: f32, avail: f32, gap: f32) -> Vec<Track> {
+    let mut out = vec![];
+    for t in css_tokens(v) {
+        let Some((n, list)) = t
+            .strip_prefix("repeat(")
+            .and_then(|r| r.strip_suffix(')'))
+            .and_then(|r| r.split_once(','))
+        else {
+            out.push(track(t, font));
+            continue;
+        };
+        let list = css_tokens(list.trim());
+        let n = n.trim().parse::<usize>().unwrap_or_else(|_| {
+            // auto-fill/auto-fit: minimum column width from minmax(min, …) or a fixed track
+            let min = list
+                .first()
+                .and_then(|l| l.strip_prefix("minmax("))
+                .and_then(|a| a.split(',').next())
+                .and_then(|m| css_len(m, font))
+                .or_else(|| list.first().and_then(|l| css_len(l, font)))
+                .unwrap_or(200.0)
+                .max(1.0);
+            ((avail + gap) / (min + gap)).floor().max(1.0) as usize
+        });
+        for _ in 0..n.min(24) {
+            out.extend(list.iter().map(|l| track(l, font)));
+        }
+    }
+    out
+}
+
+/// (x, width) of each track in a row `avail` wide: fixed and % tracks first, fr tracks share the rest,
+/// fixed tracks shrink proportionally when they overflow, and leftover space follows justify-content.
+fn place(tracks: &[Track], avail: f32, gap: f32, justify: &str) -> Vec<(f32, f32)> {
+    let n = tracks.len().max(1) as f32;
+    let space = (avail - gap * (n - 1.0)).max(0.0);
+    let fixed = |t: &Track| match *t {
+        Track::Px(v) => v.max(0.0),
+        Track::Pct(p) => avail * p / 100.0,
+        Track::Fr(_) => 0.0,
+    };
+    let fixed_sum: f32 = tracks.iter().map(fixed).sum();
+    let fr_sum: f32 = tracks
+        .iter()
+        .map(|t| if let Track::Fr(g) = t { *g } else { 0.0 })
+        .sum();
+    let shrink = if fixed_sum > space {
+        space / fixed_sum
+    } else {
+        1.0
+    };
+    let free = (space - fixed_sum * shrink).max(0.0);
+    let widths: Vec<f32> = tracks
+        .iter()
+        .map(|t| match t {
+            Track::Fr(g) if fr_sum > 0.0 => free * g / fr_sum,
+            t => fixed(t) * shrink,
+        })
+        .collect();
+    let left = if fr_sum > 0.0 { 0.0 } else { free };
+    let (mut x, step) = match justify {
+        "center" => (left / 2.0, 0.0),
+        "flex-end" | "end" | "right" => (left, 0.0),
+        "space-between" if n > 1.0 => (0.0, left / (n - 1.0)),
+        "space-around" => (left / n / 2.0, left / n),
+        "space-evenly" => (left / (n + 1.0), left / (n + 1.0)),
+        _ => (0.0, 0.0),
+    };
+    widths
+        .into_iter()
+        .map(|w| {
+            let at = (x, w);
+            x += w + gap + step;
+            at
+        })
+        .collect()
 }
 
 /// A CSS length in px; % and auto are not resolvable here.
@@ -320,12 +428,32 @@ impl BoxCss {
                 }
                 "display" => b.display = v,
                 "flex-direction" => b.column = v.starts_with("column"),
-                "grid-template-columns" => {
-                    b.cols = match v.strip_prefix("repeat(").and_then(|r| r.split(',').next()) {
-                        Some(n) => n.trim().parse().unwrap_or(1),
-                        None => css_tokens(&v).len(),
+                "grid-template-columns" => b.grid = v,
+                "gap" | "grid-gap" => b.gap = pair(&v),
+                "column-gap" => b.gap[1] = css_len(&v, font).unwrap_or(0.0),
+                "justify-content" => b.justify = v,
+                "width" | "flex-basis" if v != "auto" && !v.contains('(') => {
+                    b.width = Some(track(&v, font))
+                }
+                "flex-grow" => b.grow = v.parse().unwrap_or(0.0),
+                // flex: none | auto | <grow> [<shrink>] [<basis>]
+                "flex" => {
+                    let t = css_tokens(&v);
+                    b.grow = match v.as_str() {
+                        "none" => 0.0,
+                        "auto" => 1.0,
+                        _ => t.first().and_then(|g| g.parse().ok()).unwrap_or(0.0),
+                    };
+                    // a zero basis (flex: 1 1 0) means "no fixed width"
+                    if let Some(basis) = t
+                        .iter()
+                        .skip(1)
+                        .find_map(|x| css_len(x, font).filter(|&px| px > 0.0))
+                    {
+                        b.width = Some(Track::Px(basis));
                     }
                 }
+                "float" => b.float = v,
                 _ => {}
             }
         }
@@ -380,6 +508,48 @@ fn inner_text(n: NodeRef) -> String {
     s.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
+/// Declarations that apply to `n`: stylesheet rules in document order, then the inline style wins.
+// ponytail: no specificity or inheritance rules beyond "later wins"; enough for most app pages
+fn css_decls<'a>(n: NodeRef<'a>, rules: &'a [(scraper::Selector, String)]) -> Vec<&'a str> {
+    let mut out: Vec<&str> = vec![];
+    if let Some(er) = scraper::ElementRef::wrap(n) {
+        out.extend(
+            rules
+                .iter()
+                .filter(|(sel, _)| sel.matches(&er))
+                .map(|(_, d)| d.as_str()),
+        );
+        out.extend(er.value().attr("style"));
+    }
+    out
+}
+
+/// Lays out `cells` side by side at `place` (x, width) offsets; the row is as tall as its tallest cell.
+fn row(ui: &mut egui::Ui, cells: &[Vec<NodeRef>], place: &[(f32, f32)], s: &Style, f: &mut Flow) {
+    let top = ui.cursor().min;
+    let mut bottom = top.y;
+    for (cell, &(x, w)) in cells.iter().zip(place) {
+        let rect =
+            egui::Rect::from_min_size(top + egui::vec2(x, 0.0), egui::vec2(w, f32::INFINITY));
+        let mut ui = ui.new_child(
+            egui::UiBuilder::new()
+                .max_rect(rect)
+                .layout(egui::Layout::top_down(egui::Align::LEFT)),
+        );
+        ui.set_width(w);
+        for c in cell {
+            walk(&mut ui, *c, s, f);
+        }
+        f.flush(&mut ui);
+        bottom = bottom.max(ui.min_rect().bottom());
+    }
+    let width = place.last().map_or(0.0, |&(x, w)| x + w);
+    ui.advance_cursor_after_rect(egui::Rect::from_min_size(
+        top,
+        egui::vec2(width, bottom - top.y),
+    ));
+}
+
 fn walk(ui: &mut egui::Ui, n: NodeRef, st: &Style, f: &mut Flow) {
     if f.budget == 0 {
         return;
@@ -401,21 +571,7 @@ fn walk(ui: &mut egui::Ui, n: NodeRef, st: &Style, f: &mut Flow) {
         return;
     }
     let mut s = st.clone();
-    // stylesheet rules in document order, then the inline style wins
-    // ponytail: no specificity or inheritance rules beyond "later wins"; enough for most app pages
-    let rules = f.rules;
-    let mut decls: Vec<&str> = vec![];
-    if !rules.is_empty()
-        && let Some(er) = scraper::ElementRef::wrap(n)
-    {
-        decls.extend(
-            rules
-                .iter()
-                .filter(|(sel, _)| sel.matches(&er))
-                .map(|(_, d)| d.as_str()),
-        );
-    }
-    decls.extend(el.attr("style"));
+    let decls = css_decls(n, f.rules);
     for d in &decls {
         if !inline_style(d, &mut s) {
             return;
@@ -696,30 +852,75 @@ fn walk(ui: &mut egui::Ui, n: NodeRef, st: &Style, f: &mut Flow) {
                 if bx.bg.is_some() || bx.border.is_some() {
                     ui.set_width(ui.available_width());
                 }
-                // children that take part in a flex/grid layout
-                let items: Vec<NodeRef> = n
+                // visible children that take part in a flex/grid/float layout, with their own box CSS
+                let items: Vec<(NodeRef, BoxCss)> = n
                     .children()
-                    .filter(|c| match c.value() {
-                        Node::Element(e) => !SKIP.contains(&e.name()),
-                        Node::Text(t) => !t.trim().is_empty(),
-                        _ => false,
+                    .filter_map(|c| match c.value() {
+                        Node::Element(e)
+                            if !SKIP.contains(&e.name()) && e.attr("hidden").is_none() =>
+                        {
+                            let d = css_decls(c, f.rules);
+                            let mut tmp = Style::default();
+                            d.iter()
+                                .all(|d| inline_style(d, &mut tmp))
+                                .then(|| (c, BoxCss::parse(&d, s.size)))
+                        }
+                        Node::Text(t) if !t.trim().is_empty() => Some((c, BoxCss::default())),
+                        _ => None,
                     })
                     .collect();
-                // ponytail: flex row and grid both become equal-width columns; no justify/align, spans or fr ratios
-                let per_row = match bx.display.as_str() {
-                    "flex" | "inline-flex" if !bx.column => items.len(),
-                    "grid" | "inline-grid" => bx.cols.max(1),
-                    _ => 0,
-                };
-                if per_row > 1 {
-                    for row in items.chunks(per_row) {
-                        ui.columns(per_row, |cols| {
-                            for (ui, c) in cols.iter_mut().zip(row) {
-                                walk(ui, *c, &s, f);
-                                f.flush(ui);
-                            }
-                        });
+                let avail = ui.available_width();
+                let gap = bx.gap[1].max(ui.spacing().item_spacing.x);
+                let flex_row = matches!(bx.display.as_str(), "flex" | "inline-flex") && !bx.column;
+                let grid = matches!(bx.display.as_str(), "grid" | "inline-grid")
+                    .then(|| grid_tracks(&bx.grid, s.size, avail, gap))
+                    .unwrap_or_default();
+                let floats = !flex_row
+                    && grid.is_empty()
+                    && items
+                        .iter()
+                        .any(|(_, b)| matches!(b.float.as_str(), "left" | "right"));
+                // ponytail: no flex-wrap, align-items, order or grid spans/rows; position:absolute/fixed
+                // elements stay in place in document order (overlays and banners still show their content)
+                if flex_row && items.len() > 1 {
+                    let tracks: Vec<Track> = items
+                        .iter()
+                        .map(|(c, b)| flex_track(*c, b, s.size))
+                        .collect();
+                    let cells: Vec<Vec<NodeRef>> = items.iter().map(|(c, _)| vec![*c]).collect();
+                    row(ui, &cells, &place(&tracks, avail, gap, &bx.justify), &s, f);
+                } else if grid.len() > 1 {
+                    for (i, chunk) in items.chunks(grid.len()).enumerate() {
+                        if i > 0 {
+                            ui.add_space(bx.gap[0]);
+                        }
+                        let cells: Vec<Vec<NodeRef>> =
+                            chunk.iter().map(|(c, _)| vec![*c]).collect();
+                        row(
+                            ui,
+                            &cells,
+                            &place(&grid[..chunk.len()], avail, gap, &bx.justify),
+                            &s,
+                            f,
+                        );
                     }
+                } else if floats {
+                    // ponytail: floats become side columns (left floats, the rest of the content, right floats);
+                    // text does not wrap under a float that ends early
+                    let (mut left, mut mid, mut right) = (vec![], vec![], vec![]);
+                    for (c, b) in &items {
+                        match b.float.as_str() {
+                            "left" => left.push((vec![*c], float_track(*c, b))),
+                            "right" => right.push((vec![*c], float_track(*c, b))),
+                            _ => mid.push(*c),
+                        }
+                    }
+                    let (cells, tracks): (Vec<_>, Vec<_>) = left
+                        .into_iter()
+                        .chain([(mid, Track::Fr(1.0))])
+                        .chain(right)
+                        .unzip();
+                    row(ui, &cells, &place(&tracks, avail, gap, ""), &s, f);
                 } else {
                     kids(ui, &s, f);
                     f.flush(ui);
@@ -735,6 +936,34 @@ fn walk(ui: &mut egui::Ui, n: NodeRef, st: &Style, f: &mut Flow) {
         }
         _ => kids(ui, &s, f),
     }
+}
+
+/// Width of a flex item: flex-grow, then width/flex-basis, else an estimate of its text width.
+fn flex_track(n: NodeRef, b: &BoxCss, font: f32) -> Track {
+    if b.grow > 0.0 {
+        return Track::Fr(b.grow);
+    }
+    if let Some(w) = b.width {
+        return w;
+    }
+    // ponytail: content width guessed from the character count (~0.6em each, plus slack for button padding); text-less items share the rest
+    let chars = inner_text(n).chars().count();
+    if chars == 0 {
+        Track::Fr(1.0)
+    } else {
+        Track::Px(chars as f32 * font * 0.6 + 2.0 * b.pad[1] + 24.0)
+    }
+}
+
+/// Width of a float's side column: its CSS width, an `<img width>`, else a third of the row.
+fn float_track(n: NodeRef, b: &BoxCss) -> Track {
+    let attr = match n.value() {
+        Node::Element(e) => e
+            .attr("width")
+            .and_then(|w| w.trim_end_matches("px").parse().ok()),
+        _ => None,
+    };
+    b.width.or(attr.map(Track::Px)).unwrap_or(Track::Pct(33.0))
 }
 
 /// Image bytes for an `<img src>`: data: URIs, or an image the proxy already captured (matched by URL suffix).
@@ -1369,21 +1598,101 @@ mod tests {
             )
         );
         assert_eq!(
-            (b.bg, b.display.as_str(), b.cols),
-            (Some(Color32::WHITE), "grid", 3)
-        );
-        assert_eq!(
-            BoxCss::parse(
-                &[
-                    "grid-template-columns: 200px 1fr",
-                    "display:flex;flex-direction:column"
-                ],
-                16.0
-            )
-            .cols,
-            2
+            (b.bg, b.display.as_str(), b.grid.as_str()),
+            (Some(Color32::WHITE), "grid", "repeat(3, 1fr)")
         );
         assert!(BoxCss::parse(&["display:flex;flex-direction:column"], 16.0).column);
+    }
+
+    #[test]
+    fn flex_and_float_css() {
+        let b = |d: &str| BoxCss::parse(&[d], 10.0);
+        assert_eq!((b("flex: 1").grow, b("flex: 1").width), (1.0, None));
+        assert_eq!(b("flex: 1 1 0").width, None);
+        let fixed = b("flex: 0 0 200px");
+        assert_eq!((fixed.grow, fixed.width), (0.0, Some(Track::Px(200.0))));
+        assert_eq!((b("flex: none").grow, b("flex: auto").grow), (0.0, 1.0));
+        assert_eq!(b("flex-grow: 2").grow, 2.0);
+        assert_eq!(b("width: 25%").width, Some(Track::Pct(25.0)));
+        assert_eq!(b("width: 2em").width, Some(Track::Px(20.0)));
+        assert_eq!(b("width: auto").width, None);
+        assert_eq!(b("gap: 4px 8px").gap, [4.0, 8.0]);
+        assert_eq!(b("float: right").float, "right");
+        assert_eq!(b("justify-content: center").justify, "center");
+    }
+
+    #[test]
+    fn grid_columns() {
+        use Track::*;
+        assert_eq!(
+            grid_tracks("200px 1fr 2fr", 16.0, 800.0, 0.0),
+            [Px(200.0), Fr(1.0), Fr(2.0)]
+        );
+        assert_eq!(
+            grid_tracks("repeat(3, 1fr)", 16.0, 800.0, 0.0),
+            [Fr(1.0); 3]
+        );
+        assert_eq!(
+            grid_tracks("repeat(2, 10% 1fr)", 16.0, 800.0, 0.0),
+            [Pct(10.0), Fr(1.0), Pct(10.0), Fr(1.0)]
+        );
+        assert_eq!(
+            grid_tracks("repeat(3, minmax(0, 1fr))", 16.0, 800.0, 0.0),
+            [Fr(1.0); 3]
+        );
+        assert_eq!(grid_tracks("auto 1fr", 16.0, 800.0, 0.0), [Fr(1.0); 2]);
+        // 4 columns of >= 180px fit in 800px with 10px gaps (4*180 + 3*10 = 750)
+        assert_eq!(
+            grid_tracks("repeat(auto-fill, minmax(180px, 1fr))", 16.0, 800.0, 10.0).len(),
+            4
+        );
+        assert_eq!(
+            grid_tracks("repeat(auto-fit, minmax(900px, 1fr))", 16.0, 800.0, 10.0).len(),
+            1
+        );
+    }
+
+    #[test]
+    fn placement() {
+        use Track::*;
+        // fixed sidebar + fr ratios share the rest
+        assert_eq!(
+            place(&[Px(200.0), Fr(1.0), Fr(3.0)], 1000.0, 0.0, ""),
+            [(0.0, 200.0), (200.0, 200.0), (400.0, 600.0)]
+        );
+        // % of the row, gap counted between tracks
+        assert_eq!(
+            place(&[Pct(25.0), Fr(1.0)], 400.0, 10.0, ""),
+            [(0.0, 100.0), (110.0, 290.0)]
+        );
+        // overflowing fixed tracks shrink proportionally
+        assert_eq!(
+            place(&[Px(300.0), Px(100.0)], 200.0, 0.0, ""),
+            [(0.0, 150.0), (150.0, 50.0)]
+        );
+        // justify-content distributes leftover space when nothing grows
+        let two = [Px(100.0), Px(100.0)];
+        assert_eq!(
+            place(&two, 400.0, 0.0, "center"),
+            [(100.0, 100.0), (200.0, 100.0)]
+        );
+        assert_eq!(
+            place(&two, 400.0, 0.0, "flex-end"),
+            [(200.0, 100.0), (300.0, 100.0)]
+        );
+        assert_eq!(
+            place(&two, 400.0, 0.0, "space-between"),
+            [(0.0, 100.0), (300.0, 100.0)]
+        );
+        assert_eq!(
+            place(&two, 400.0, 0.0, "space-around"),
+            [(50.0, 100.0), (250.0, 100.0)]
+        );
+        // a growing track leaves nothing to justify
+        assert_eq!(
+            place(&[Px(100.0), Fr(1.0)], 400.0, 0.0, "center"),
+            [(0.0, 100.0), (100.0, 300.0)]
+        );
     }
 
     #[test]
@@ -1399,6 +1708,9 @@ mod tests {
             <pre>  pre  text</pre><blockquote>q</blockquote><img alt="logo"><div style="display:none">x</div>
             <div style="display:flex;background:#eee;padding:8px;border:1px solid #ccc;border-radius:4px"><span>a</span><b>b</b></div>
             <section style="display:grid;grid-template-columns:repeat(2,1fr)"><div>1</div><div>2</div><div>3</div></section>
+            <div style="display:flex;justify-content:space-between"><b style="flex:1">a</b><i style="width:20%">b</i><span>c</span><p style="display:none">x</p></div>
+            <div><img src="x.png" width="80" style="float:left"><div style="float:right;width:100px">r</div><p>text</p></div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px"><div>1</div><div>2</div></div>
             <table><tr><td><img src="x.png" alt="i"><a href="/">l</a><table><tr><td>nested</td></tr></table></td></tr></table>
             <script>alert(1)</script></body></html>"##;
         let ctx = egui::Context::default();
