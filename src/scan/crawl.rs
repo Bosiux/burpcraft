@@ -17,11 +17,7 @@ pub fn links(base_path: &str, html: &str, t: &Target) -> (Vec<String>, Vec<Strin
             .map(|c| c[1].to_string())
     };
     let input = regex::Regex::new(r#"(?is)<(?:input|textarea|select)\b([^>]*)>"#).unwrap();
-    let origin = format!(
-        "{}://{}",
-        if t.tls { "https" } else { "http" },
-        host_header(t)
-    );
+    let origin = origin_of(t);
     let resolve = |u: &str| -> Option<String> {
         let u = crate::http::codec::html_decode(u.trim());
         if let Some(rest) = u.strip_prefix(&origin) {
@@ -117,7 +113,8 @@ pub(crate) fn crawl(c: &Ctx, start: &str, status: &Mutex<String>) -> Vec<String>
         if seen.len() >= c.cfg.max_pages || c.stop.load(Ordering::SeqCst) {
             break;
         }
-        if !seen.insert(shape(&path)) {
+        // out-of-scope pages neither count toward max_pages nor get fetched
+        if !c.in_scope(&path) || !seen.insert(shape(&path)) {
             continue;
         }
         *status.lock().unwrap() = format!("Crawling: {} pages, {path}", seen.len());

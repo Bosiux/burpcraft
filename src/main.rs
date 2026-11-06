@@ -244,7 +244,13 @@ impl App {
     }
 
     fn start_rest(&mut self, port: u16, key: String) {
-        let msg = match rest::start(port, key, self.scans.clone(), self.state.clone()) {
+        let msg = match rest::start(
+            port,
+            key,
+            self.scans.clone(),
+            self.state.clone(),
+            self.target.scope.clone(),
+        ) {
             Ok(p) => {
                 self.rest_port = Some(p);
                 format!("REST API listening on http://127.0.0.1:{p}/v0.1/")
@@ -278,7 +284,14 @@ impl App {
     ) {
         let mut scans = self.scans.lock().unwrap();
         let id = scans.len() + 1;
-        scans.push(scan::start(id, urls, extra, cfg, self.state.clone()));
+        scans.push(scan::start(
+            id,
+            urls,
+            extra,
+            cfg,
+            self.state.clone(),
+            self.target.scope.clone(),
+        ));
         self.tab = "Dashboard";
     }
 
@@ -339,6 +352,7 @@ impl App {
                     )],
                     cfg,
                     self.state.clone(),
+                    self.target.scope.clone(),
                 ));
             }
         }

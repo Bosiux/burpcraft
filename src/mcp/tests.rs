@@ -322,6 +322,21 @@ fn scan_start_openapi_with_auth() {
 }
 
 #[test]
+fn scan_start_refuses_out_of_scope() {
+    let c = ctx();
+    c.scope
+        .lock()
+        .unwrap()
+        .push((true, true, "http://in.test/".into()));
+    let (r, err) = tool(&c, "scan_start", r#"{"urls":["http://out.test/"]}"#);
+    assert!(
+        err && format!("{r:?}").contains("outside the Target scope"),
+        "{r:?}"
+    );
+    assert!(c.tasks.lock().unwrap().is_empty());
+}
+
+#[test]
 fn forward_all_releases_queue() {
     let c = ctx();
     let mut held = Vec::new();

@@ -14,16 +14,24 @@ use std::sync::{Arc, Mutex};
 use crate::automation::openapi::J;
 use crate::proxy::State;
 use crate::scan::{self, Task};
+use crate::tools::target::Scope;
 
 pub type Tasks = Arc<Mutex<Vec<Task>>>;
 
-pub fn start(port: u16, key: String, tasks: Tasks, state: State) -> std::io::Result<u16> {
+pub fn start(
+    port: u16,
+    key: String,
+    tasks: Tasks,
+    state: State,
+    scope: Scope,
+) -> std::io::Result<u16> {
     let l = TcpListener::bind(("127.0.0.1", port))?;
     let port = l.local_addr()?.port();
     std::thread::spawn(move || {
         for c in l.incoming().flatten() {
-            let (tasks, state, key) = (tasks.clone(), state.clone(), key.clone());
-            std::thread::spawn(move || handle(c, &key, &tasks, &state));
+            let (tasks, state, scope, key) =
+                (tasks.clone(), state.clone(), scope.clone(), key.clone());
+            std::thread::spawn(move || handle(c, &key, &tasks, &state, &scope));
         }
     });
     Ok(port)
@@ -73,6 +81,7 @@ pub fn route(
     key: &str,
     tasks: &Tasks,
     state: &State,
+    scope: &Scope,
 ) -> (&'static str, String, String) {
     let path = if key.is_empty() {
         path
@@ -148,9 +157,27 @@ pub fn route(
             if let Some(J::Bool(b)) = req.get("crawl") {
                 cfg.crawl = *b;
             }
+            if let Some(u) = scan::out_of_scope(scope, &urls, &[]) {
+                return (
+                    "400 Bad Request",
+                    String::new(),
+                    obj(vec![(
+                        "error",
+                        s(format!("{u} is outside the Target scope")),
+                    )])
+                    .to_json(),
+                );
+            }
             let mut t = tasks.lock().unwrap();
             let id = t.len() + 1;
-            t.push(scan::start(id, urls, vec![], cfg, state.clone()));
+            t.push(scan::start(
+                id,
+                urls,
+                vec![],
+                cfg,
+                state.clone(),
+                scope.clone(),
+            ));
             ("201 Created", format!("Location: {id}\r\n"), String::new())
         }
         ("GET", p) if p.starts_with("/v0.1/scan/") => {
@@ -203,7 +230,7 @@ pub fn route(
     }
 }
 
-fn handle(mut c: TcpStream, key: &str, tasks: &Tasks, state: &State) {
+fn handle(mut c: TcpStream, key: &str, tasks: &Tasks, state: &State, scope: &Scope) {
     let _ = c.set_read_timeout(Some(std::time::Duration::from_secs(10)));
     let Ok(rc) = c.try_clone() else { return };
     let mut r = BufReader::new(rc);
@@ -228,6 +255,7 @@ fn handle(mut c: TcpStream, key: &str, tasks: &Tasks, state: &State) {
         key,
         tasks,
         state,
+        scope,
     );
     let _ = write!(
         c,
@@ -243,17 +271,21 @@ mod tests {
     #[test]
     fn routes() {
         let (tasks, state): (Tasks, State) = (Default::default(), crate::proxy::Shared::new());
-        assert_eq!(route("GET", "/v0.1/", "", "", &tasks, &state).0, "200 OK");
+        let scope = Scope::default();
         assert_eq!(
-            route("GET", "/v0.1/", "", "k3y", &tasks, &state).0,
-            "401 Unauthorized"
-        );
-        assert_eq!(
-            route("GET", "/k3y/v0.1/", "", "k3y", &tasks, &state).0,
+            route("GET", "/v0.1/", "", "", &tasks, &state, &scope).0,
             "200 OK"
         );
         assert_eq!(
-            route("POST", "/v0.1/scan", "{nope", "", &tasks, &state).0,
+            route("GET", "/v0.1/", "", "k3y", &tasks, &state, &scope).0,
+            "401 Unauthorized"
+        );
+        assert_eq!(
+            route("GET", "/k3y/v0.1/", "", "k3y", &tasks, &state, &scope).0,
+            "200 OK"
+        );
+        assert_eq!(
+            route("POST", "/v0.1/scan", "{nope", "", &tasks, &state, &scope).0,
             "400 Bad Request"
         );
         assert_eq!(
@@ -263,7 +295,8 @@ mod tests {
                 r#"{"urls": ["ftp://x"]}"#,
                 "",
                 &tasks,
-                &state
+                &state,
+                &scope
             )
             .0,
             "400 Bad Request"
@@ -276,12 +309,13 @@ mod tests {
             "",
             &tasks,
             &state,
+            &scope,
         );
         assert_eq!((st, loc.as_str()), ("201 Created", "Location: 1\r\n"));
         let mut body = String::new();
         // up to 10s: on Windows a refused localhost connect takes ~2s (SYN retries)
         for _ in 0..500 {
-            body = route("GET", "/v0.1/scan/1", "", "", &tasks, &state).2;
+            body = route("GET", "/v0.1/scan/1", "", "", &tasks, &state, &scope).2;
             if body.contains("\"succeeded\"") {
                 break;
             }
@@ -291,8 +325,23 @@ mod tests {
         assert_eq!(j.get("scan_status"), Some(&J::Str("succeeded".into())));
         assert_eq!(j.get("issue_events"), Some(&J::Arr(vec![])));
         assert_eq!(
-            route("GET", "/v0.1/scan/9", "", "", &tasks, &state).0,
+            route("GET", "/v0.1/scan/9", "", "", &tasks, &state, &scope).0,
             "404 Not Found"
         );
+        scope
+            .lock()
+            .unwrap()
+            .push((true, true, "http://in.test/".into()));
+        let (st, _, body) = route(
+            "POST",
+            "/v0.1/scan",
+            r#"{"urls": ["http://127.0.0.1:9/"]}"#,
+            "",
+            &tasks,
+            &state,
+            &scope,
+        );
+        assert_eq!(st, "400 Bad Request");
+        assert!(body.contains("outside the Target scope"), "{body}");
     }
 }

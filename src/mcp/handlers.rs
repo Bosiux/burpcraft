@@ -350,9 +350,19 @@ pub(crate) fn call(name: &str, a: &J, ctx: &Ctx) -> Result<J, String> {
             cfg.crawl = bool_arg(a, "crawl").unwrap_or(extra.is_empty());
             cfg.headers = str_arg(a, "headers").unwrap_or("").into();
             cfg.login = str_arg(a, "login").unwrap_or("").into();
+            if let Some(u) = scan::out_of_scope(&ctx.scope, &urls, &extra) {
+                return Err(format!("{u} is outside the Target scope"));
+            }
             let mut t = ctx.tasks.lock().unwrap();
             let id = t.len() + 1;
-            t.push(scan::start(id, urls, extra, cfg, ctx.state.clone()));
+            t.push(scan::start(
+                id,
+                urls,
+                extra,
+                cfg,
+                ctx.state.clone(),
+                ctx.scope.clone(),
+            ));
             Ok(obj(vec![("task_id", n(id))]))
         }
         "scan_status" => {
@@ -477,7 +487,7 @@ pub(crate) fn call(name: &str, a: &J, ctx: &Ctx) -> Result<J, String> {
 /// Reuses the REST API's JSON for scans and issues.
 fn rest_get(path: &str, ctx: &Ctx) -> Result<J, String> {
     let (status, _, body) =
-        crate::automation::rest::route("GET", path, "", "", &ctx.tasks, &ctx.state);
+        crate::automation::rest::route("GET", path, "", "", &ctx.tasks, &ctx.state, &ctx.scope);
     let j = openapi::parse(&body).map_err(|e| e.to_string())?;
     if status.starts_with("200") {
         Ok(j)

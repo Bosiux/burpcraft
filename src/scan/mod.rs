@@ -9,6 +9,7 @@ use std::time::Duration;
 
 use crate::proxy::{self, State};
 use crate::security::scanner::Severity;
+use crate::tools::target::{Scope, url_in_scope};
 
 mod checks;
 mod config;
@@ -24,13 +25,32 @@ pub(crate) use points::*;
 
 // ------------------------------------------------------------ entry points
 
-/// Starts a scan task: crawl (optional) and audit `urls`, plus `extra` raw requests (from history or an API definition).
+/// First start URL or request outside the Target scope, when the scope has include rules
+/// (callers driven by agents/CI refuse such scans instead of silently skipping them).
+pub fn out_of_scope(scope: &Scope, urls: &[String], extra: &[(Target, String)]) -> Option<String> {
+    let rules = scope.lock().unwrap();
+    if !rules.iter().any(|(on, inc, _)| *on && *inc) {
+        return None;
+    }
+    urls.iter()
+        .map(|u| u.trim().to_string())
+        .chain(
+            extra
+                .iter()
+                .map(|(t, r)| format!("{}{}", origin_of(t), r.split(' ').nth(1).unwrap_or("/"))),
+        )
+        .find(|u| !url_in_scope(&rules, u, false))
+}
+
+/// Starts a scan task: crawl (optional) and audit `urls`, plus `extra` raw requests (from history
+/// or an API definition). Every request it sends is checked against `scope`.
 pub fn start(
     id: usize,
     urls: Vec<String>,
     extra: Vec<(Target, String)>,
     cfg: Config,
     state: State,
+    scope: Scope,
 ) -> Task {
     let name = urls
         .first()
@@ -45,18 +65,11 @@ pub fn start(
             })
         })
         .unwrap_or_default();
-    let origin = |t: &Target| {
-        format!(
-            "{}://{}",
-            if t.tls { "https" } else { "http" },
-            host_header(t)
-        )
-    };
     let mut origins: Vec<String> = urls
         .iter()
         .filter_map(|u| parse_url(u.trim()))
-        .map(|(t, _)| origin(&t))
-        .chain(extra.iter().map(|(t, _)| origin(t)))
+        .map(|(t, _)| origin_of(&t))
+        .chain(extra.iter().map(|(t, _)| origin_of(t)))
         .collect();
     origins.dedup();
     let task = Task {
@@ -83,6 +96,7 @@ pub fn start(
         task.stop.clone(),
         task.done.clone(),
     );
+    let skipped = Arc::new(AtomicUsize::new(0));
     std::thread::spawn(move || {
         let mut work: Vec<(Target, String)> = extra;
         let mut ctxs: Vec<Arc<Ctx>> = vec![];
@@ -104,6 +118,8 @@ pub fn start(
                 oob: Mutex::default(),
                 pages: Mutex::default(),
                 stored_left: AtomicUsize::new(STORED_REFETCH_BUDGET),
+                scope: scope.clone(),
+                skipped: skipped.clone(),
             });
             if !cfg.login.trim().is_empty() {
                 *status.lock().unwrap() = "Logging in".into();
@@ -219,11 +235,16 @@ pub fn start(
         *status.lock().unwrap() = if stop.load(Ordering::SeqCst) {
             "Stopped".into()
         } else {
-            format!(
+            let mut msg = format!(
                 "Finished: {} requests, {} issues",
                 requests.load(Ordering::SeqCst),
                 issues.load(Ordering::SeqCst)
-            )
+            );
+            match skipped.load(Ordering::SeqCst) {
+                0 => {}
+                k => msg += &format!(", {k} out-of-scope requests skipped"),
+            }
+            msg
         };
         done.store(true, Ordering::SeqCst);
         if let Some(ctx) = state.lock().unwrap().ctx.clone() {
@@ -407,6 +428,75 @@ mod tests {
     }
 
     #[test]
+    fn scan_never_sends_out_of_scope() {
+        let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = l.local_addr().unwrap().port();
+        let seen: Arc<Mutex<Vec<String>>> = Default::default();
+        let log = seen.clone();
+        std::thread::spawn(move || {
+            for mut c in l.incoming().flatten() {
+                let mut r = BufReader::new(c.try_clone().unwrap());
+                let (mut first, mut h) = (String::new(), String::new());
+                r.read_line(&mut first).unwrap();
+                while r.read_line(&mut h).is_ok_and(|n| n > 2) {
+                    h.clear();
+                }
+                log.lock().unwrap().push(first);
+                let body = r#"<a href="/admin/x?q=1">a</a><a href="/pub?q=1">p</a>"#;
+                let _ = write!(
+                    c,
+                    "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                );
+            }
+        });
+        let base = format!("http://127.0.0.1:{port}");
+        let scope: Scope = Default::default();
+        *scope.lock().unwrap() = vec![
+            (true, true, format!("{base}/")),
+            (true, false, format!("{base}/admin")),
+        ];
+        let t = Target {
+            host: "127.0.0.1".into(),
+            port,
+            tls: false,
+        };
+        let admin = get_request(&t, "/admin/y?q=1");
+        assert_eq!(
+            out_of_scope(&scope, &[format!("{base}/")], &[(t.clone(), admin.clone())]),
+            Some(format!("{base}/admin/y?q=1"))
+        );
+        let mut cfg = Config::fast();
+        cfg.checks = [false; CHECKS.len()];
+        let task = start(
+            1,
+            vec![format!("{base}/")],
+            vec![(t, admin)],
+            cfg,
+            proxy::Shared::new(),
+            scope,
+        );
+        for _ in 0..500 {
+            if task.done.load(Ordering::SeqCst) {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        let seen = seen.lock().unwrap();
+        assert!(
+            seen.iter().any(|l| l.starts_with("GET /pub?q=1 ")),
+            "{seen:?}"
+        );
+        assert!(!seen.iter().any(|l| l.contains("/admin")), "{seen:?}");
+        assert!(
+            task.status
+                .lock()
+                .unwrap()
+                .contains("out-of-scope requests skipped")
+        );
+    }
+
+    #[test]
     fn crawls_and_finds_each_issue_class() {
         let _g = crate::security::collab::TEST_LOCK
             .lock()
@@ -445,6 +535,7 @@ mod tests {
             )],
             Config::fast(),
             state.clone(),
+            Default::default(),
         );
         for _ in 0..600 {
             if task.done.load(Ordering::SeqCst) {
