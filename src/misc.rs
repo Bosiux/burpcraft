@@ -5,6 +5,21 @@ use egui_extras::{Column, TableBuilder};
 use crate::proxy::Entry;
 use crate::theme;
 
+/// Opens a file or URL with the OS default handler.
+pub fn open_external(target: impl AsRef<std::ffi::OsStr>) -> std::io::Result<()> {
+    let opener = if cfg!(target_os = "macos") {
+        "open"
+    } else if cfg!(windows) {
+        "explorer"
+    } else {
+        "xdg-open"
+    };
+    std::process::Command::new(opener)
+        .arg(target)
+        .spawn()
+        .map(|_| ())
+}
+
 const STATUSES: [&str; 3] = ["New", "In progress", "Done"];
 
 #[derive(Default)]

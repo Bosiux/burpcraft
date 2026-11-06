@@ -726,7 +726,7 @@ impl App {
                             let msg = match report::write(&s.issues, &s.history, html) {
                                 Ok(p) => {
                                     if html {
-                                        let _ = std::process::Command::new(if cfg!(target_os = "macos") { "open" } else if cfg!(windows) { "explorer" } else { "xdg-open" }).arg(&p).spawn();
+                                        let _ = misc::open_external(&p);
                                     }
                                     format!("Report written to {}", p.display())
                                 }
