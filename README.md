@@ -116,7 +116,7 @@ claude mcp add --transport http burpcraft http://127.0.0.1:1338/mcp   # + --head
 | `intruder` | `§`-marked attack: sniper, battering_ram, pitchfork, cluster_bomb; grep per response; `anomalies` returns only the odd rows |
 | `intercept` · `intercept_queue` · `intercept_forward` · `intercept_drop` | MITM: hold, read, edit-and-forward or drop live requests/responses |
 | `rules` · `scope` | match-and-replace rules, target scope (get, or replace with `set`) |
-| `scan_start` · `scan_status` · `issues` | active scan of URLs or one request, progress, findings |
+| `scan_start` · `scan_status` · `issues` | active scan of URLs, one request or an OpenAPI definition (optionally authenticated), progress, findings |
 | `collaborator` | built-in or remote OAST server, payloads, interactions |
 | `codec` | base64 / url / html / hex, md5 / sha* |
 | `open_in` · `events` | show an item in a UI tool for the human, app event log |
