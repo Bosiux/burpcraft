@@ -373,14 +373,6 @@ fn target(a: &J, req: &str) -> Result<scan::Target, String> {
         .ok_or_else(|| format!("bad target {t:?}: use scheme://host[:port]"))
 }
 
-fn status_of(resp: &[u8]) -> u16 {
-    String::from_utf8_lossy(proxy::head(resp))
-        .split_whitespace()
-        .nth(1)
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(0)
-}
-
 fn source<'a>(a: &J, st: &'a proxy::Shared) -> &'a [Entry] {
     if str_arg(a, "source") == Some("logger") {
         &st.logger
@@ -532,7 +524,7 @@ fn call(name: &str, a: &J, ctx: &Ctx) -> Result<J, String> {
                 &resp,
             );
             Ok(obj(vec![
-                ("status", n(status_of(&resp))),
+                ("status", n(proxy::status_of(&resp))),
                 ("ms", n(ms)),
                 ("response", s(text(&resp, max))),
             ]))
@@ -910,7 +902,7 @@ fn intruder_attack(a: &J, ctx: &Ctx, grep: Option<regex::Regex>) -> Result<J, St
                                     "payloads",
                                     J::Arr(payloads.iter().cloned().map(s).collect()),
                                 ),
-                                ("status", n(status_of(resp))),
+                                ("status", n(proxy::status_of(resp))),
                                 ("length", n(resp.len())),
                                 ("ms", n(ms)),
                                 ("match", m.unwrap_or(J::Null)),

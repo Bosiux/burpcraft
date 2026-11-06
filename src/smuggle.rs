@@ -15,18 +15,10 @@ pub struct Finding {
     pub req: String,
 }
 
-fn host_header(t: &Target) -> String {
-    if (t.tls && t.port == 443) || (!t.tls && t.port == 80) {
-        t.host.clone()
-    } else {
-        format!("{}:{}", t.host, t.port)
-    }
-}
-
 fn baseline(t: &Target) -> String {
     format!(
         "POST / HTTP/1.1\r\nHost: {}\r\nContent-Length: 0\r\n\r\n",
-        host_header(t)
+        crate::scan::host_header(t)
     )
 }
 
@@ -35,7 +27,7 @@ fn baseline(t: &Target) -> String {
 fn clte_probe(t: &Target) -> String {
     format!(
         "POST / HTTP/1.1\r\nHost: {}\r\nContent-Length: 4\r\nTransfer-Encoding: chunked\r\n\r\n1\r\nA\r\nX",
-        host_header(t)
+        crate::scan::host_header(t)
     )
 }
 
@@ -44,7 +36,7 @@ fn clte_probe(t: &Target) -> String {
 fn tecl_probe(t: &Target) -> String {
     format!(
         "POST / HTTP/1.1\r\nHost: {}\r\nContent-Length: 6\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\nX",
-        host_header(t)
+        crate::scan::host_header(t)
     )
 }
 

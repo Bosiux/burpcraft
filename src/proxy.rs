@@ -193,6 +193,15 @@ pub fn body(msg: &[u8]) -> Option<&[u8]> {
     find(msg, b"\r\n\r\n").map(|i| &msg[i + 4..])
 }
 
+/// HTTP status code from a raw response, or 0 if absent/unparseable.
+pub fn status_of(resp: &[u8]) -> u16 {
+    String::from_utf8_lossy(head(resp))
+        .split_whitespace()
+        .nth(1)
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0)
+}
+
 pub fn find(h: &[u8], n: &[u8]) -> Option<usize> {
     h.windows(n.len()).position(|w| w == n)
 }

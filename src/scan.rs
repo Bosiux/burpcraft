@@ -289,7 +289,7 @@ pub fn parse_url(url: &str) -> Option<(Target, String)> {
     (!host.is_empty()).then_some((Target { host, port, tls }, path))
 }
 
-fn host_header(t: &Target) -> String {
+pub(crate) fn host_header(t: &Target) -> String {
     if (t.tls && t.port == 443) || (!t.tls && t.port == 80) {
         t.host.clone()
     } else {
@@ -304,14 +304,6 @@ pub fn get_request(t: &Target, path: &str) -> String {
     )
 }
 
-fn status_of(resp: &[u8]) -> u16 {
-    String::from_utf8_lossy(proxy::head(resp))
-        .split_whitespace()
-        .nth(1)
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(0)
-}
-
 pub fn entry_of(t: &Target, req: &str, resp: &[u8], tool: &'static str) -> Entry {
     let mut line = req.lines().next().unwrap_or("").split(' ');
     Entry {
@@ -321,7 +313,7 @@ pub fn entry_of(t: &Target, req: &str, resp: &[u8], tool: &'static str) -> Entry
         tls: t.tls,
         method: line.next().unwrap_or("").into(),
         url: line.next().unwrap_or("").into(),
-        status: status_of(resp),
+        status: proxy::status_of(resp),
         req: req.as_bytes().to_vec(),
         resp: resp.to_vec(),
         edited: false,
@@ -778,7 +770,7 @@ fn audit_point(c: &Ctx, req: &str, p: &Point, base: &(Vec<u8>, Duration)) {
         let pl = "https://burpcraft-redirect.example/";
         let r = inject(req, p, pl);
         if let Some((resp, _)) = c.send(&r)
-            && (300..400).contains(&status_of(&resp))
+            && (300..400).contains(&proxy::status_of(&resp))
             && crate::net::header(&String::from_utf8_lossy(proxy::head(&resp)), "location")
                 .is_some_and(|l| l.starts_with(pl) || l.starts_with("//burpcraft-redirect.example"))
         {
