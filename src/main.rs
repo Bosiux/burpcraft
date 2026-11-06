@@ -106,6 +106,7 @@ struct App {
     project: Option<std::path::PathBuf>,
     /// Project dialog: (saving?, typed path, status message).
     project_dlg: Option<(bool, String, String)>,
+    autosave: project::Autosave,
     search: search::Search,
     engage: engage::Engage,
     collab: collab::Tab,
@@ -193,7 +194,7 @@ impl App {
         if let Some(path) = std::env::args_os().nth(1).map(std::path::PathBuf::from) {
             match project::open(&mut app, &path) {
                 Ok(()) => app.project = Some(path),
-                // a new path starts a new project there, saved on exit
+                // a new path starts a new project there, autosaved and saved on exit
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => app.project = Some(path),
                 Err(e) => app
                     .state
@@ -235,6 +236,7 @@ impl App {
             frames: 0,
             project: None,
             project_dlg: None,
+            autosave: Default::default(),
             search: Default::default(),
             engage: Default::default(),
             collab: Default::default(),
@@ -661,6 +663,18 @@ impl App {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui.button("Settings").clicked() {
                     self.settings.open = true;
+                }
+                if let Some(p) = &self.project {
+                    ui.label(
+                        RichText::new(&self.autosave.status)
+                            .small()
+                            .color(theme::muted()),
+                    )
+                    .on_hover_text(format!(
+                        "Autosaved every {} s to {}",
+                        project::AUTOSAVE.as_secs(),
+                        p.display()
+                    ));
                 }
             });
         });
@@ -2078,6 +2092,7 @@ impl eframe::App for App {
             self.entry_action(what, e, false);
         }
         self.run_schedules(ui.ctx());
+        project::autosave(self, ui.ctx());
         if ui.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::S)) {
             self.run(ui.ctx(), Cmd::SaveProject);
         }

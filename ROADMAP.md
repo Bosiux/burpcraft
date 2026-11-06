@@ -50,7 +50,7 @@ into `<OUT>.png` with sample traffic (uses the BURPCRAFT_SHOT / BURPCRAFT_TAB de
 - [ ] Scanner: no stored XSS, DOM checks only via DOM Invader, no XXE checks; request smuggling is timing-only (no obfuscated Transfer-Encoding variants, no H2 downgrade, no differential confirmation)
 - [ ] BChecks: no nested `if`, no Collaborator built-ins (`generate_collaborator_address()`), one `run for each` variable, no request/response modification beyond payload and method/path
 - [ ] BurpCraft AI: a live answer was not exercised on the dev machine (no Anthropic API key there)
-- [ ] Project files are written on save/exit, not continuously like a disk-based project
+- [ ] Project files are rewritten whole (autosave every 30 s, crash-safe), not incrementally like Burp's disk-based project: a crash loses up to 30 s of work; a temporary project (no file open) is not autosaved
 - [ ] Scanner: crawler/audit responses are not passively scanned (only proxied traffic is); header insertion points are only User-Agent and Referer
 - [ ] Scanner: Target scope is not applied (a scan stays on the origins it is given; the crawler is same-origin); delay/rate limit only in the New scan dialog, not over REST/MCP
 - [ ] REST API `/v0.1/scan`: no API definition, authentication, threads or delay fields (MCP `scan_start` has openapi/headers/login)
@@ -85,7 +85,7 @@ Status: ✅ done · 🟡 partial · ❌ missing
 | API-definition scanning | Import OpenAPI/Swagger and scan the endpoints | ✅ OpenAPI 3 / Swagger 2, JSON or YAML |
 | Authenticated scanning | Recorded login or credentials used during crawl/audit | ✅ extra headers + raw login request whose cookies join every request |
 | Reports | Export issues as HTML/XML | ✅ Dashboard "Report (HTML)" / "Export (XML)", with request/response evidence, in ~/.burpcraft/reports |
-| Project files | Save/reopen all state on disk: history, site map, Repeater, issues, settings | ✅ Project menu Open/Save/Save as, Ctrl+S, `burpcraft <file>`, saved on exit (gzip, own format) |
+| Project files | Save/reopen all state on disk: history, site map, Repeater, issues, settings | ✅ Project menu Open/Save/Save as, Ctrl+S, `burpcraft <file>`, saved on exit and autosaved every 30 s when changed (background, atomic temp+fsync+rename; gzip, own format) |
 | Unthrottled Intruder | Community is throttled; Pro adds payload processing, grep match/extract, more payload types | ✅ unthrottled; runtime file, brute forcer, null, character blocks; 11 processing rules; Grep match/extract/payloads columns |
 | Global search | Text/regex search across all tools | ✅ Search menu / Ctrl+Shift+F: history, Logger, WebSockets, Repeater, issues; click jumps to the item |
 | Engagement tools | Target analyzer, content discovery (file/dir brute force), find comments/scripts/references, CSRF PoC generator, simulate manual testing | ✅ history context menu: analyze, discover content (soft-404 aware), comments, scripts, references, CSRF PoC (form/GET/text-plain). Skipped "simulate manual testing" (fake traffic only) |

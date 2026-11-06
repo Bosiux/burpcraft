@@ -74,7 +74,7 @@ flowchart LR
 ```sh
 cargo run --release                     # starts the app; the proxy listens on 127.0.0.1:8080
 BURPCRAFT_PROXY=8090 cargo run --release   # another proxy port
-cargo run --release -- my.burpcraft     # open or create a project file
+cargo run --release -- my.burpcraft     # open or create a project file (autosaved every 30 s)
 BURPCRAFT_API=1337 cargo run --release  # also start the REST API on 127.0.0.1:1337
 ```
 
