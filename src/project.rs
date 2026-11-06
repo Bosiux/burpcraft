@@ -1,8 +1,14 @@
 //! Project files: saves and reopens the session state (history, logger, WebSockets, issues, scope,
 //! match-and-replace rules, Repeater/Intruder tabs, Organizer, Comparer) as one gzip file.
 //! Format: magic line, then length-prefixed fields in a fixed order (no serde dependency).
-// ponytail: whole-file save on demand/exit, not Burp's continuously written disk project; add a write-ahead log if crashes lose too much
+//! While a project file is open it is autosaved in the background every `AUTOSAVE` when it changed.
+// ponytail: whole-file rewrite, not Burp's incremental disk project; a crash loses at most AUTOSAVE of work, add a write-ahead log if that is too much
+use std::hash::Hasher;
 use std::io::{self, Read, Write};
+use std::path::Path;
+use std::time::{Duration, Instant};
+
+use eframe::egui;
 
 use crate::App;
 use crate::proxy::{Entry, Rule, WsMsg};
@@ -282,26 +288,118 @@ pub fn decode(app: &mut App, data: &[u8]) -> io::Result<()> {
     Ok(())
 }
 
-pub fn save(app: &App, path: &std::path::Path) -> io::Result<()> {
-    if let Some(dir) = path.parent() {
+pub const AUTOSAVE: Duration = Duration::from_secs(30);
+
+/// Autosave state: when it last ran, a hash of what is on disk, the running background save.
+#[derive(Default)]
+pub struct Autosave {
+    last: Option<Instant>,
+    saved: u64,
+    job: Option<std::thread::JoinHandle<io::Result<Option<u64>>>>,
+    /// "Saved HH:MM:SS" or the last error, shown next to Settings.
+    pub status: String,
+}
+
+fn hash(body: &[u8]) -> u64 {
+    let mut h = std::hash::DefaultHasher::new();
+    h.write(body);
+    h.finish()
+}
+
+/// Gzips `body` into `<path>.tmp`, fsyncs and renames it over `path`, so a crash mid-save
+/// leaves the previous project intact.
+fn write(path: &Path, body: &[u8]) -> io::Result<()> {
+    let dir = path.parent().filter(|d| !d.as_os_str().is_empty());
+    if let Some(dir) = dir {
         std::fs::create_dir_all(dir)?;
     }
     let mut gz = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
     gz.write_all(MAGIC)?;
-    gz.write_all(&encode(app))?;
-    // write then rename, so a crash mid-save never leaves a half-written project
-    let tmp = path.with_extension("tmp");
-    std::fs::write(&tmp, gz.finish()?)?;
-    std::fs::rename(tmp, path)
+    gz.write_all(body)?;
+    let data = gz.finish()?;
+    let mut tmp = path.as_os_str().to_owned();
+    tmp.push(".tmp");
+    let tmp = std::path::PathBuf::from(tmp);
+    let res = std::fs::File::create(&tmp)
+        .and_then(|mut f| f.write_all(&data).and_then(|()| f.sync_all()))
+        .and_then(|()| std::fs::rename(&tmp, path));
+    if res.is_err() {
+        let _ = std::fs::remove_file(&tmp);
+    }
+    // the rename itself is durable once the directory is synced (best effort: not possible on Windows)
+    let _ = std::fs::File::open(dir.unwrap_or(Path::new("."))).and_then(|d| d.sync_all());
+    res
 }
 
-pub fn open(app: &mut App, path: &std::path::Path) -> io::Result<()> {
+/// Waits for a running background save, so saves never race on the same file.
+fn settle(a: &mut Autosave) {
+    if let Some(Ok(Ok(Some(h)))) = a.job.take().map(|j| j.join()) {
+        a.saved = h;
+    }
+}
+
+pub fn save(app: &mut App, path: &Path) -> io::Result<()> {
+    settle(&mut app.autosave);
+    let body = encode(app);
+    write(path, &body)?;
+    app.autosave.saved = hash(&body);
+    app.autosave.status = format!("Saved {}", chrono::Local::now().format("%H:%M:%S"));
+    Ok(())
+}
+
+pub fn open(app: &mut App, path: &Path) -> io::Result<()> {
     let mut data = vec![];
     flate2::read::GzDecoder::new(std::fs::File::open(path)?).read_to_end(&mut data)?;
     let body = data.strip_prefix(MAGIC).ok_or_else(|| {
         io::Error::new(io::ErrorKind::InvalidData, "not a BurpCraft project file")
     })?;
-    decode(app, body)
+    decode(app, body)?;
+    settle(&mut app.autosave);
+    // decode/encode round-trips, so this is the hash of the reopened state
+    (app.autosave.saved, app.autosave.status) = (hash(body), String::new());
+    Ok(())
+}
+
+/// Called every frame: collects a finished background save and, every AUTOSAVE while a project
+/// file is open, snapshots the state here and hashes/compresses/writes it on a thread if it changed.
+pub fn autosave(app: &mut App, ctx: &egui::Context) {
+    let a = &mut app.autosave;
+    if let Some(job) = a.job.take_if(|j| j.is_finished()) {
+        match job.join() {
+            Ok(Ok(Some(h))) => {
+                a.saved = h;
+                a.status = format!("Saved {}", chrono::Local::now().format("%H:%M:%S"));
+            }
+            Ok(Ok(None)) => {}
+            Ok(Err(e)) => {
+                a.status = format!("Autosave failed: {e}");
+                let msg = a.status.clone();
+                app.state.lock().unwrap().event("Project", msg);
+            }
+            Err(_) => a.status = "Autosave failed".into(),
+        }
+    }
+    let Some(path) = app.project.clone() else {
+        return;
+    };
+    let a = &mut app.autosave;
+    ctx.request_repaint_after(if a.job.is_some() {
+        Duration::from_secs(1)
+    } else {
+        AUTOSAVE
+    });
+    if a.job.is_some() || a.last.is_some_and(|t| t.elapsed() < AUTOSAVE) {
+        return;
+    }
+    a.last = Some(Instant::now());
+    let (body, saved) = (encode(app), app.autosave.saved);
+    app.autosave.job = Some(std::thread::spawn(move || {
+        let h = hash(&body);
+        if h == saved {
+            return Ok(None);
+        }
+        write(&path, &body).map(|()| Some(h))
+    }));
 }
 
 pub fn default_path() -> std::path::PathBuf {
@@ -374,7 +472,7 @@ mod tests {
         let dir =
             std::env::temp_dir().join(format!("burpcraft-project-test-{}", std::process::id()));
         let path = dir.join("p.burpcraft");
-        save(&a, &path).unwrap();
+        save(&mut a, &path).unwrap();
 
         let mut b = App::blank(crate::proxy::Shared::new());
         open(&mut b, &path).unwrap();
@@ -396,6 +494,33 @@ mod tests {
             ("HTTP/1.1 200 OK", a.intruder.tabs[0].template.as_str())
         );
         drop(s);
+
+        // nothing changed since the save: autosave writes nothing; a new comment is written
+        let ctx = egui::Context::default();
+        b.project = Some(path.clone());
+        let run = |b: &mut App| {
+            b.autosave.last = None;
+            autosave(b, &ctx);
+            b.autosave.job.take().unwrap().join().unwrap().unwrap()
+        };
+        assert_eq!(run(&mut b), None);
+        b.state.lock().unwrap().history[0].comment = "edited".into();
+        let h = run(&mut b).unwrap();
+        b.autosave.saved = h;
+        assert_eq!(run(&mut b), None);
+        let mut c = App::blank(crate::proxy::Shared::new());
+        open(&mut c, &path).unwrap();
+        assert_eq!(c.state.lock().unwrap().history[0].comment, "edited");
+
+        // a failed save (here: the temp file cannot be created) leaves the previous file intact
+        let mut tmp = path.as_os_str().to_owned();
+        tmp.push(".tmp");
+        std::fs::create_dir(&tmp).unwrap();
+        c.state.lock().unwrap().history.clear();
+        assert!(save(&mut c, &path).is_err());
+        open(&mut c, &path).unwrap();
+        assert_eq!(c.state.lock().unwrap().history.len(), 2);
+        std::fs::remove_dir(&tmp).unwrap();
 
         // corrupt or foreign files are rejected without touching the open project
         std::fs::write(&path, b"not gzip").unwrap();
