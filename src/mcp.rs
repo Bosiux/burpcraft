@@ -96,8 +96,8 @@ const TOOLS: &[(&str, &str, &str)] = &[
     ),
     (
         "scan_start",
-        "Start an active scan in the background. Either urls (crawl + audit) or one raw request + target (audit its parameters). Returns task_id for scan_status.",
-        r#"{"type":"object","properties":{"urls":{"type":"array","items":{"type":"string"}},"request":{"type":"string"},"target":{"type":"string"},"thorough":{"type":"boolean"},"crawl":{"type":"boolean","description":"default true"}}}"#,
+        "Start an active scan in the background. Either urls (crawl + audit), one raw request + target (audit its parameters), or openapi (audit every operation; urls[0] overrides its server). headers/login authenticate every request. Returns task_id for scan_status.",
+        r#"{"type":"object","properties":{"urls":{"type":"array","items":{"type":"string"}},"request":{"type":"string"},"target":{"type":"string"},"openapi":{"type":"string","description":"OpenAPI 3 / Swagger 2 JSON text"},"headers":{"type":"string","description":"extra `Name: value` lines on every request"},"login":{"type":"string","description":"raw login request sent first; its cookies join every request"},"thorough":{"type":"boolean"},"crawl":{"type":"boolean","description":"default true"}}}"#,
     ),
     (
         "scan_status",
@@ -687,17 +687,23 @@ fn call(name: &str, a: &J, ctx: &Ctx) -> Result<J, String> {
             ))
         }
         "scan_start" => {
-            let urls = a.get("urls").map(strs).unwrap_or_default();
+            let mut urls = a.get("urls").map(strs).unwrap_or_default();
             if urls.iter().any(|u| scan::parse_url(u).is_none()) {
                 return Err("`urls` must be absolute http(s) URLs".into());
             }
-            let extra = match str_arg(a, "request") {
+            let mut extra = match str_arg(a, "request") {
                 Some(r) => {
                     let r = raw(r);
                     vec![(target(a, &r)?, r)]
                 }
                 None => vec![],
             };
+            if let Some(doc) = str_arg(a, "openapi") {
+                // as in the New scan dialog: the URL is the API base, not a crawl start
+                let base = urls.first().cloned();
+                extra.extend(openapi::requests(&openapi::parse(doc)?, base.as_deref())?);
+                urls.clear();
+            }
             if urls.is_empty() && extra.is_empty() {
                 return Err("give `urls` or `request`".into());
             }
@@ -707,6 +713,8 @@ fn call(name: &str, a: &J, ctx: &Ctx) -> Result<J, String> {
                 scan::Config::fast()
             };
             cfg.crawl = bool_arg(a, "crawl").unwrap_or(extra.is_empty());
+            cfg.headers = str_arg(a, "headers").unwrap_or("").into();
+            cfg.login = str_arg(a, "login").unwrap_or("").into();
             let mut t = ctx.tasks.lock().unwrap();
             let id = t.len() + 1;
             t.push(scan::start(id, urls, extra, cfg, ctx.state.clone()));
@@ -1269,6 +1277,46 @@ mod tests {
         // off by default: the plain row list
         let (r, _) = tool(&c, "intruder", &args(""));
         assert!(matches!(r, J::Arr(v) if v.len() == 4));
+    }
+
+    #[test]
+    fn scan_start_openapi_with_auth() {
+        let c = ctx();
+        let port = echo_server();
+        let doc = r#"{\"openapi\":\"3.0.0\",\"paths\":{\"/op\":{\"get\":{\"parameters\":[{\"name\":\"q\",\"in\":\"query\"}]}}}}"#;
+        let (r, err) = tool(
+            &c,
+            "scan_start",
+            &format!(
+                r#"{{"urls":["http://127.0.0.1:{port}"],"openapi":"{doc}","headers":"X-T: 1","login":"POST /login HTTP/1.1\nHost: x\n\n"}}"#
+            ),
+        );
+        assert!(!err, "{r:?}");
+        let task = c.tasks.lock().unwrap().pop().unwrap();
+        for _ in 0..500 {
+            if task.done.load(Ordering::SeqCst) {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        let st = c.state.lock().unwrap();
+        let sent: Vec<String> = st
+            .logger
+            .iter()
+            .map(|e| String::from_utf8_lossy(&e.req).into_owned())
+            .collect();
+        assert!(
+            sent.len() > 1 && sent[0].starts_with("POST /login "),
+            "{sent:?}"
+        );
+        // the definition's operation, not a crawl of the base URL, with the extra header
+        assert!(
+            sent.iter()
+                .skip(1)
+                .all(|r| r.starts_with("GET /op?q=") && r.contains("\r\nX-T: 1\r\n"))
+        );
+        let (r, err) = tool(&c, "scan_start", r#"{"openapi":"{}"}"#);
+        assert!(err, "{r:?}");
     }
 
     #[test]
