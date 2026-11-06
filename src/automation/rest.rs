@@ -1,8 +1,10 @@
 //! REST API (Pro): start scans and read their results from scripts or CI, on localhost.
 //! Burp-style routes under `/v0.1/`; an optional key goes in the path (`/<key>/v0.1/...`).
 //!
-//!   POST /v0.1/scan            {"urls": ["http://t/"], "scan_configurations": [{"name": "thorough"}], "crawl": true}
-//!                              -> 201 Created, Location: <task id>
+//!   POST /v0.1/scan            {"urls": ["http://t/"], "scan_configurations": [{"name": "thorough"}], "crawl": true,
+//!                               "scope": {"include": [{"rule": "http://t/"}], "exclude": [{"rule": "http://t/logout"}]},
+//!                               "request", "target", "openapi", "headers", "login", "threads", "delay_ms"}
+//!                              -> 201 Created, Location: <task id>   (same fields as MCP `scan_start`)
 //!   GET  /v0.1/scan/<id>       -> {"task_id", "scan_status", "scan_metrics": {...}, "issue_events": [...]}
 //!   GET  /v0.1/issues          -> every issue found so far (passive and active)
 //!   GET  /v0.1/                -> API info
@@ -13,7 +15,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::automation::openapi::J;
 use crate::proxy::State;
-use crate::scan::{self, Task};
+use crate::scan::Task;
 use crate::tools::target::Scope;
 
 pub type Tasks = Arc<Mutex<Vec<Task>>>;
@@ -124,60 +126,16 @@ pub fn route(
                     );
                 }
             };
-            let urls: Vec<String> = match req.get("urls") {
-                Some(J::Arr(v)) => v
-                    .iter()
-                    .filter_map(|u| {
-                        if let J::Str(u) = u {
-                            Some(u.clone())
-                        } else {
-                            None
-                        }
-                    })
-                    .collect(),
-                _ => vec![],
+            let id = match crate::mcp::start_scan(&req, tasks, state, scope) {
+                Ok(id) => id,
+                Err(e) => {
+                    return (
+                        "400 Bad Request",
+                        String::new(),
+                        obj(vec![("error", s(e))]).to_json(),
+                    );
+                }
             };
-            if urls.is_empty() || urls.iter().any(|u| scan::parse_url(u).is_none()) {
-                return (
-                    "400 Bad Request",
-                    String::new(),
-                    obj(vec![(
-                        "error",
-                        s("\"urls\" must list absolute http(s) URLs"),
-                    )])
-                    .to_json(),
-                );
-            }
-            let thorough = matches!(req.get("scan_configurations"), Some(J::Arr(v)) if v.iter().any(|c| matches!(c.get("name"), Some(J::Str(n)) if n.to_ascii_lowercase().contains("thorough"))));
-            let mut cfg = if thorough {
-                scan::Config::thorough()
-            } else {
-                scan::Config::fast()
-            };
-            if let Some(J::Bool(b)) = req.get("crawl") {
-                cfg.crawl = *b;
-            }
-            if let Some(u) = scan::out_of_scope(scope, &urls, &[]) {
-                return (
-                    "400 Bad Request",
-                    String::new(),
-                    obj(vec![(
-                        "error",
-                        s(format!("{u} is outside the Target scope")),
-                    )])
-                    .to_json(),
-                );
-            }
-            let mut t = tasks.lock().unwrap();
-            let id = t.len() + 1;
-            t.push(scan::start(
-                id,
-                urls,
-                vec![],
-                cfg,
-                state.clone(),
-                scope.clone(),
-            ));
             ("201 Created", format!("Location: {id}\r\n"), String::new())
         }
         ("GET", p) if p.starts_with("/v0.1/scan/") => {
@@ -342,6 +300,18 @@ mod tests {
             &scope,
         );
         assert_eq!(st, "400 Bad Request");
-        assert!(body.contains("outside the Target scope"), "{body}");
+        assert!(body.contains("outside the scan scope"), "{body}");
+        // MCP parity: a raw request + target, a per-scan Burp-style scope, threads/delay
+        let req = |b: &str| route("POST", "/v0.1/scan", b, "", &tasks, &state, &scope);
+        let ok = r#"{"request": "GET /?q=1 HTTP/1.1\nHost: x\n\n", "target": "http://127.0.0.1:9", "threads": 2, "delay_ms": 1, "scope": {"include": [{"rule": "http://127.0.0.1:9/"}]}}"#;
+        assert_eq!(req(ok).0, "201 Created");
+        let (st, _, body) = req(
+            r#"{"urls": ["http://127.0.0.1:9/logout"], "scope": {"include": [{"rule": "http://127.0.0.1:9/"}], "exclude": [{"rule": "http://127.0.0.1:9/logout"}]}}"#,
+        );
+        assert!(
+            st == "400 Bad Request" && body.contains("outside the scan scope"),
+            "{body}"
+        );
+        assert_eq!(req(r#"{"crawl": true}"#).0, "400 Bad Request");
     }
 }
