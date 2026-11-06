@@ -5,6 +5,7 @@ use std::time::{Duration, Instant};
 
 use crate::proxy::{self, Entry, State};
 use crate::security::scanner::{Issue, Severity};
+use crate::tools::target::{Scope, url_in_scope};
 
 // ------------------------------------------------------------ task
 
@@ -43,6 +44,10 @@ pub(crate) struct Ctx {
     pub(crate) pages: Mutex<Vec<String>>,
     /// Shared ceiling on total stored-XSS re-fetches, so point count can't explode traffic.
     pub(crate) stored_left: AtomicUsize,
+    /// Target scope rules; with no include rule the scan's own origins are the scope.
+    pub(crate) scope: Scope,
+    /// Requests not sent because they were out of scope.
+    pub(crate) skipped: Arc<AtomicUsize>,
 }
 
 pub fn parse_url(url: &str) -> Option<(Target, String)> {
@@ -60,6 +65,14 @@ pub fn parse_url(url: &str) -> Option<(Target, String)> {
         _ => (hostport.to_string(), if tls { 443 } else { 80 }),
     };
     (!host.is_empty()).then_some((Target { host, port, tls }, path))
+}
+
+pub fn origin_of(t: &Target) -> String {
+    format!(
+        "{}://{}",
+        if t.tls { "https" } else { "http" },
+        host_header(t)
+    )
 }
 
 pub(crate) fn host_header(t: &Target) -> String {
@@ -100,9 +113,19 @@ pub fn entry_of(t: &Target, req: &str, resp: &[u8], tool: &'static str) -> Entry
 }
 
 impl Ctx {
-    /// Adds auth headers/cookies, sends, logs; None when stopped or on a network error.
+    /// Whether `path` on this target is in the Target scope (exclude rules always apply).
+    pub(crate) fn in_scope(&self, path: &str) -> bool {
+        let url = format!("{}{path}", origin_of(&self.target));
+        url_in_scope(&self.scope.lock().unwrap(), &url, true)
+    }
+
+    /// Adds auth headers/cookies, sends, logs; None when stopped, out of scope or on a network error.
     pub(crate) fn send(&self, req: &str) -> Option<(Vec<u8>, Duration)> {
         if self.stop.load(Ordering::SeqCst) {
+            return None;
+        }
+        if !self.in_scope(req.split(' ').nth(1).unwrap_or("/")) {
+            self.skipped.fetch_add(1, Ordering::SeqCst);
             return None;
         }
         let mut req = req.to_string();
@@ -217,7 +240,10 @@ impl Ctx {
 
     /// Timing-based request smuggling (CL.TE / TE.CL), once per target.
     pub(crate) fn host_smuggle(&self) {
-        if self.stop.load(Ordering::SeqCst) || !self.cfg.on("HTTP request smuggling (timing)") {
+        if self.stop.load(Ordering::SeqCst)
+            || !self.cfg.on("HTTP request smuggling (timing)")
+            || !self.in_scope("/")
+        {
             return;
         }
         if let Some(f) = crate::security::smuggle::detect(&self.target, Duration::from_secs(10)) {
