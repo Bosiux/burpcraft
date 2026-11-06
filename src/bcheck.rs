@@ -28,8 +28,8 @@
 //! `name = "a", "b", "c"` line, which runs the whole check once per value. `{name}` is replaced in
 //! the rest of the file (values may use earlier ones); `{random_str(8)}` is a fresh random string.
 //! Branches: `if ... then`, any number of `else if ... then`, an optional `else`, then `end if`;
-//! the first branch whose condition holds reports its `report issue:` (a branch without one
-//! reports nothing).
+//! the first branch whose condition holds reports its `report issue:` (in an if/else chain a
+//! branch without one reports nothing; a plain `if` always reports).
 use std::sync::{Mutex, OnceLock};
 
 use crate::scanner::Severity;
@@ -378,7 +378,10 @@ fn parse_body(src: &str) -> Result<BCheck, String> {
     if b.given == Given::Host && !matches!(b.action, Action::Request { .. }) {
         return Err("a host check needs `send request` with a `path`".into());
     }
-    if !b.reports && !b.orelse.iter().any(|o| o.reports) {
+    // checks written before `else` existed may omit `report issue:`; a plain `if` still reports
+    if b.orelse.is_empty() {
+        b.reports = true;
+    } else if !b.reports && !b.orelse.iter().any(|o| o.reports) {
         return Err("missing `report issue:`".into());
     }
     Ok(b)
@@ -721,12 +724,21 @@ mod tests {
                 "`else` without `if`",
             ),
             (
-                "metadata:\n name: \"n\"\ngiven response then\n if \"x\" in {latest.response} then\n end if",
+                "metadata:\n name: \"n\"\ngiven response then\n if \"x\" in {latest.response} then\n else\n end if",
                 "missing `report issue:`",
             ),
         ] {
             let e = parse(bad).unwrap_err();
             assert!(e.contains(why), "{e}");
         }
+        // a plain `if` without `report issue:` (pre-`else` checks) still reports
+        let old = parse("metadata:\n name: \"n\"\ngiven response then\n if \"x\" in {latest.response} then\n  detail: \"d\"\n end if").unwrap();
+        assert!(
+            old.matched(&Responses {
+                latest: &resp("x"),
+                base: None
+            })
+            .is_some()
+        );
     }
 }
