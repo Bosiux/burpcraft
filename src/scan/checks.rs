@@ -3,7 +3,7 @@ use std::sync::atomic::Ordering;
 use std::time::Duration;
 
 use crate::proxy;
-use crate::scanner::Severity;
+use crate::security::scanner::Severity;
 
 // ------------------------------------------------------------ checks
 
@@ -72,17 +72,17 @@ fn audit_point(c: &Ctx, req: &str, p: &Point, base: &(Vec<u8>, Duration)) {
     let orig = req[p.start..p.end].to_string();
     // BChecks: `given [kind] insertion point`
     let kind = format!("{:?}", p.kind).to_ascii_lowercase();
-    for b in crate::bcheck::enabled(
-        |g| matches!(g, crate::bcheck::Given::Point(k) if k.as_ref().is_none_or(|k| *k == kind)),
+    for b in crate::security::bcheck::enabled(
+        |g| matches!(g, crate::security::bcheck::Given::Point(k) if k.as_ref().is_none_or(|k| *k == kind)),
     ) {
         let value = match &b.action {
-            crate::bcheck::Action::Append(s) => format!("{orig}{s}"),
-            crate::bcheck::Action::Replace(s) => s.clone(),
+            crate::security::bcheck::Action::Append(s) => format!("{orig}{s}"),
+            crate::security::bcheck::Action::Replace(s) => s.clone(),
             _ => continue,
         };
         let r = inject(req, p, &value);
         if let Some((resp, _)) = c.send(&r)
-            && let Some(m) = b.matched(&crate::bcheck::Responses {
+            && let Some(m) = b.matched(&crate::security::bcheck::Responses {
                 latest: &resp,
                 base: Some(&base.0),
             })
@@ -211,7 +211,7 @@ fn audit_point(c: &Ctx, req: &str, p: &Point, base: &(Vec<u8>, Duration)) {
         }
         if c.cfg.on("Out-of-band interactions (Collaborator)") {
             let label = format!("Scan {} {lab} xxe {}", c.task, p.start);
-            let host = crate::collab::client().lock().unwrap().payload(&label);
+            let host = crate::security::collab::client().lock().unwrap().payload(&label);
             if let Some(host) = host {
                 let r = xxe_inject(req, p, &format!("http://{host}/"));
                 if c.send(&r).is_some() {
@@ -327,7 +327,7 @@ fn audit_point(c: &Ctx, req: &str, p: &Point, base: &(Vec<u8>, Duration)) {
         }
     }
     if c.cfg.on("Out-of-band interactions (Collaborator)") {
-        let mut cl = crate::collab::client().lock().unwrap();
+        let mut cl = crate::security::collab::client().lock().unwrap();
         if cl.configured() {
             let mut plan = vec![];
             for (what, issue) in [

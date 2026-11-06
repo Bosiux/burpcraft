@@ -1,9 +1,6 @@
 // release builds are a GUI app on Windows: no console window
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 mod ai;
-mod bcheck;
-mod collab;
-mod domi;
 mod editor;
 mod engage;
 mod ext;
@@ -20,10 +17,9 @@ mod render;
 mod report;
 mod rest;
 mod scan;
-mod scanner;
 mod search;
+mod security;
 mod sequencer;
-mod smuggle;
 mod target;
 mod theme;
 mod tools;
@@ -36,6 +32,7 @@ use eframe::egui::{self, RichText};
 
 use http::net;
 use proxy::{Entry, State};
+use security::{collab, domi};
 use ui::HistFilter;
 
 const MAIN_TABS: [&str; 13] = [

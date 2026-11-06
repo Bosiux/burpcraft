@@ -230,7 +230,7 @@ impl Intruder {
                             ui.add(egui::DragValue::new(n).range(1..=10_000));
                             ui.label("unique Collaborator payloads");
                         });
-                        if !crate::collab::client().lock().unwrap().configured() {
+                        if !crate::security::collab::client().lock().unwrap().configured() {
                             ui.label(RichText::new("No Collaborator server configured (see the Collaborator tab)").color(theme::muted()));
                         }
                     }

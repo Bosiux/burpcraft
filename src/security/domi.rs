@@ -6,7 +6,7 @@
 //! `--dump-dom`), and as a POST to a reserved host that the BurpCraft proxy turns into issues while
 //! you browse with "Open browser".
 use crate::proxy::State;
-use crate::scanner::{Issue, Severity};
+use crate::security::scanner::{Issue, Severity};
 
 pub const REPORT_HOST: &str = "burpcraft-dom-invader.invalid";
 pub const CANARY: &str = "bcdi7q3x";

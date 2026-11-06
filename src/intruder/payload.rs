@@ -80,7 +80,7 @@ impl Payload {
     pub fn resolve(&self) -> Vec<String> {
         match self {
             Payload::Collaborator(n) => {
-                let mut c = crate::collab::client().lock().unwrap();
+                let mut c = crate::security::collab::client().lock().unwrap();
                 (0..(*n).min(10_000))
                     .filter_map(|_| c.payload("Intruder"))
                     .collect()

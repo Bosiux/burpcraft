@@ -42,7 +42,7 @@ fn evidence(label: &str, msg: &[u8]) -> String {
 }
 
 /// Messages API request body (non-streaming; refusals fall back server-side to another model).
-pub fn request_body(issue: &crate::scanner::Issue, req: &[u8], resp: &[u8]) -> String {
+pub fn request_body(issue: &crate::security::scanner::Issue, req: &[u8], resp: &[u8]) -> String {
     let user = format!(
         "Finding: {}\nSeverity: {} / confidence: {}\nLocation: {}{}\nScanner detail: {}\n\n{}\n\n{}",
         issue.name,
@@ -143,7 +143,7 @@ fn call(body: &str, api_key: &str) -> Result<String, String> {
 
 /// Starts an explanation in the background; the result appears in `answers()`.
 pub fn explain(
-    issue: crate::scanner::Issue,
+    issue: crate::security::scanner::Issue,
     req: Vec<u8>,
     resp: Vec<u8>,
     ctx: eframe::egui::Context,
@@ -170,7 +170,7 @@ pub fn explain(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::scanner::{Issue, Severity};
+    use crate::security::scanner::{Issue, Severity};
 
     #[test]
     fn request_and_response_shapes() {

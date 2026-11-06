@@ -1,7 +1,7 @@
 //! Issue reports: a standalone HTML page (summary by severity, then each issue with its evidence) and an XML export.
 use crate::http::codec::html_encode;
 use crate::proxy::Entry;
-use crate::scanner::{Issue, Severity};
+use crate::security::scanner::{Issue, Severity};
 
 fn esc(s: &str) -> String {
     html_encode(s.as_bytes(), false)

@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use crate::proxy::{self, State};
-use crate::scanner::Severity;
+use crate::security::scanner::Severity;
 
 mod checks;
 mod config;
@@ -197,9 +197,9 @@ pub fn start(
             *status.lock().unwrap() = "Waiting for out-of-band interactions".into();
             for _ in 0..3 {
                 std::thread::sleep(Duration::from_secs(2));
-                let _ = crate::collab::poll();
+                let _ = crate::security::collab::poll();
             }
-            let hits = crate::collab::interactions_for(&format!("Scan {id} "));
+            let hits = crate::security::collab::interactions_for(&format!("Scan {id} "));
             for (c, (label, issue, detail, req)) in pending {
                 if let Some((it, _)) = hits.iter().find(|(_, l)| *l == label) {
                     c.report(
@@ -408,12 +408,12 @@ mod tests {
 
     #[test]
     fn crawls_and_finds_each_issue_class() {
-        let _g = crate::collab::TEST_LOCK
+        let _g = crate::security::collab::TEST_LOCK
             .lock()
             .unwrap_or_else(|e| e.into_inner());
         let collab = burpcraft_server::start(burpcraft_server::Config::default()).unwrap();
         {
-            let mut c = crate::collab::client().lock().unwrap();
+            let mut c = crate::security::collab::client().lock().unwrap();
             (c.server, c.domain, c.secret) = (
                 format!("127.0.0.1:{}", collab.http_port),
                 String::new(),
@@ -422,9 +422,9 @@ mod tests {
         }
         let port = vulnerable_app();
         {
-            let mut b = crate::bcheck::checks().lock().unwrap();
-            b.0.push(crate::bcheck::parse(crate::bcheck::TEMPLATE).unwrap());
-            b.0.push(crate::bcheck::parse("metadata:\n name: \"Echoed marker\"\ngiven query insertion point then\n send payload:\n  replacing: \"bcmark42\"\n if \"bcmark42\" in {latest.response.body} then\n  report issue:\n   severity: info\n end if").unwrap());
+            let mut b = crate::security::bcheck::checks().lock().unwrap();
+            b.0.push(crate::security::bcheck::parse(crate::security::bcheck::TEMPLATE).unwrap());
+            b.0.push(crate::security::bcheck::parse("metadata:\n name: \"Echoed marker\"\ngiven query insertion point then\n send payload:\n  replacing: \"bcmark42\"\n if \"bcmark42\" in {latest.response.body} then\n  report issue:\n   severity: info\n end if").unwrap());
         }
         let state = proxy::Shared::new();
         let xml_body = "<?xml version=\"1.0\"?><data><name>test</name></data>";

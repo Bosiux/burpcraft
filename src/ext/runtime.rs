@@ -133,7 +133,7 @@ fn report(j: &J, ext_name: &str) {
             )
         })
         .unwrap_or_default();
-    use crate::scanner::Severity;
+    use crate::security::scanner::Severity;
     let severity = match text(j, "severity").to_ascii_lowercase().as_str() {
         "high" => Severity::High,
         "medium" => Severity::Medium,
@@ -151,7 +151,7 @@ fn report(j: &J, ext_name: &str) {
         return;
     }
     let id = s.issues.len() + 1;
-    s.issues.push(crate::scanner::Issue {
+    s.issues.push(crate::security::scanner::Issue {
         id,
         name,
         severity,

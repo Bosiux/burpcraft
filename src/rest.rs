@@ -39,7 +39,7 @@ fn obj(v: Vec<(&str, J)>) -> J {
     J::Obj(v.into_iter().map(|(k, v)| (k.to_string(), v)).collect())
 }
 
-fn issues_json(state: &State, origin_filter: Option<&dyn Fn(&crate::scanner::Issue) -> bool>) -> J {
+fn issues_json(state: &State, origin_filter: Option<&dyn Fn(&crate::security::scanner::Issue) -> bool>) -> J {
     let st = state.lock().unwrap();
     J::Arr(
         st.issues
@@ -184,7 +184,7 @@ pub fn route(
                     "issue_events",
                     issues_json(
                         state,
-                        Some(&|i: &crate::scanner::Issue| task.origins.contains(&i.origin)),
+                        Some(&|i: &crate::security::scanner::Issue| task.origins.contains(&i.origin)),
                     ),
                 ),
             ]);

@@ -7,7 +7,7 @@ use std::time::Instant;
 
 use crate::openapi::{self, J};
 use crate::proxy::{self, Entry, Rule};
-use crate::{http::codec, collab, http::net, scan};
+use crate::{http::codec, security::collab, http::net, scan};
 
 use super::Ctx;
 use super::attack::intruder_attack;

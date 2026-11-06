@@ -149,11 +149,11 @@ fn serve<S: Stream>(
             }
         };
         // DOM Invader reports from "Open browser" end here instead of going upstream
-        if host == crate::domi::REPORT_HOST {
-            let found = crate::domi::parse_findings(&String::from_utf8_lossy(
+        if host == crate::security::domi::REPORT_HOST {
+            let found = crate::security::domi::parse_findings(&String::from_utf8_lossy(
                 body(&msg).unwrap_or_default(),
             ));
-            crate::domi::record(&state, &found);
+            crate::security::domi::record(&state, &found);
             r.get_mut().write_all(b"HTTP/1.1 204 No Content\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: 0\r\n\r\n")?;
             continue;
         }
@@ -270,8 +270,8 @@ fn serve<S: Stream>(
             highlight: None,
             tool: "Proxy",
         };
-        let mut found = crate::scanner::passive(&entry);
-        found.extend(crate::bcheck::passive(&entry));
+        let mut found = crate::security::scanner::passive(&entry);
+        found.extend(crate::security::bcheck::passive(&entry));
         crate::ext::on_response(&entry);
         if !found.is_empty() {
             let mut s = state.lock().unwrap();
