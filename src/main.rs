@@ -147,7 +147,16 @@ impl App {
             }
         };
         if let Some(ca) = &ca {
-            proxy::start(state.clone(), ca.clone(), 8080);
+            // BURPCRAFT_PROXY=port moves the listener off 8080 (0 = any free port)
+            match std::env::var("BURPCRAFT_PROXY").map(|v| (v.parse::<u16>(), v)) {
+                Err(_) => proxy::start(state.clone(), ca.clone(), 8080),
+                Ok((Ok(port), _)) => proxy::start(state.clone(), ca.clone(), port),
+                // not 8080: the user set the variable to stay off it
+                Ok((Err(_), v)) => state.lock().unwrap().event(
+                    "Proxy",
+                    format!("Proxy not started: BURPCRAFT_PROXY={v:?} is not a port number"),
+                ),
+            }
         }
         // dev hooks: BURPCRAFT_TAB / BURPCRAFT_PROXY_TAB pick the start screen (used with BURPCRAFT_SHOT)
         let pick = |var: &str, list: &[&'static str], def: &'static str| {
@@ -975,13 +984,24 @@ impl App {
             self.intercept_text = Some((*id, req.clone()));
         }
         let mut decision: Option<Option<Vec<u8>>> = None;
+        let mut forward_all = false;
         ui.horizontal(|ui| {
             let has = front.is_some();
-            let fwd = if has {
-                theme::primary_button(ui, "Forward")
-            } else {
-                ui.add_enabled(false, egui::Button::new("Forward"))
-            };
+            let fwd = theme::split_button(ui, "Forward", has, |ui| {
+                if ui
+                    .button("Forward all")
+                    .on_hover_text("Release every held message; intercept stays on")
+                    .clicked()
+                {
+                    // the message on screen goes as edited, the rest unchanged
+                    decision = Some(
+                        self.intercept_text
+                            .as_ref()
+                            .map(|(_, t)| t.clone().into_bytes()),
+                    );
+                    forward_all = true;
+                }
+            });
             if fwd.clicked() {
                 decision = Some(
                     self.intercept_text
@@ -1003,9 +1023,7 @@ impl App {
                 s.intercept = !on;
                 if on {
                     // turning intercept off releases everything queued unchanged
-                    for p in s.queue.drain(..) {
-                        let _ = p.reply.send(Some(p.req));
-                    }
+                    s.forward_all();
                 }
             }
             ui.menu_button("Action ...", |ui| {
@@ -1061,6 +1079,9 @@ impl App {
             let mut s = self.state.lock().unwrap();
             if let Some(p) = s.queue.pop_front() {
                 let _ = p.reply.send(d);
+            }
+            if forward_all {
+                s.forward_all();
             }
             self.intercept_text = None;
             return;
@@ -1956,9 +1977,17 @@ fn next_time(hhmm: &str) -> Option<chrono::DateTime<chrono::Local>> {
 
 /// Launches a Chromium-based browser pre-configured to use the proxy, like the original's embedded browser.
 fn open_browser(state: &State) {
+    let port = state.lock().unwrap().listener;
+    let Some(port) = port else {
+        state.lock().unwrap().event(
+            "Proxy",
+            "Failed to launch browser: the proxy is not running",
+        );
+        return;
+    };
     let dir = net::data_dir().join("browser-profile");
     let args = [
-        "--proxy-server=127.0.0.1:8080".to_string(),
+        format!("--proxy-server=127.0.0.1:{port}"),
         "--ignore-certificate-errors".into(),
         "--proxy-bypass-list=<-loopback>".into(),
         format!("--user-data-dir={}", dir.display()),
@@ -1973,9 +2002,9 @@ fn open_browser(state: &State) {
     let ok = render::chromium_path()
         .is_some_and(|c| std::process::Command::new(c).args(&args).spawn().is_ok());
     let msg = if ok {
-        "Browser launched with proxy 127.0.0.1:8080"
+        format!("Browser launched with proxy 127.0.0.1:{port}")
     } else {
-        "Failed to launch browser: no Chromium-based browser found"
+        "Failed to launch browser: no Chromium-based browser found".to_string()
     };
     state.lock().unwrap().event("Proxy", msg);
 }
@@ -2139,9 +2168,7 @@ impl App {
             let mut s = self.state.lock().unwrap();
             s.intercept = !s.intercept;
             if !s.intercept {
-                for p in s.queue.drain(..) {
-                    let _ = p.reply.send(Some(p.req));
-                }
+                s.forward_all();
             }
         }
         if self.tab == "Proxy" && self.proxy_tab == "Intercept" && hit(M::COMMAND, Key::F) {

@@ -149,7 +149,7 @@ pub fn learn(ui: &mut egui::Ui) {
     let guides = [
         (
             "Proxy your browser",
-            "Click Proxy > Intercept > Open browser, or set your browser's HTTP and HTTPS proxy to 127.0.0.1:8080 and install ~/.burpcraft/ca.pem as a trusted CA.",
+            "Click Proxy > Intercept > Open browser, or set your browser's HTTP and HTTPS proxy to 127.0.0.1:8080 (or the BURPCRAFT_PROXY port) and install ~/.burpcraft/ca.pem as a trusted CA.",
         ),
         (
             "Intercept and modify",

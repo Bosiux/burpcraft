@@ -257,8 +257,13 @@ pub fn scan(url: &str, state: &State, proxy: bool) -> Result<Vec<Finding>, Strin
             "--dump-dom".into(),
         ];
         if proxy {
+            let port = state
+                .lock()
+                .unwrap()
+                .listener
+                .ok_or("The proxy is not running")?;
             args.extend([
-                "--proxy-server=127.0.0.1:8080".into(),
+                format!("--proxy-server=127.0.0.1:{port}"),
                 "--proxy-bypass-list=<-loopback>".into(),
                 "--ignore-certificate-errors".into(),
             ]);

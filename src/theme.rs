@@ -182,6 +182,73 @@ pub fn primary_button(ui: &mut egui::Ui, label: &str) -> egui::Response {
     )
 }
 
+/// One button with a dropdown arrow on its right edge: the left part returns its response, the
+/// arrow opens `menu`. The arrow is painted because the app font has no such glyph.
+pub fn split_button(
+    ui: &mut egui::Ui,
+    label: &str,
+    enabled: bool,
+    menu: impl FnOnce(&mut egui::Ui),
+) -> egui::Response {
+    let style = |b: egui::Button<'static>| {
+        if enabled {
+            b.fill(ORANGE).stroke(Stroke::new(1.0, ORANGE_DARK))
+        } else {
+            b
+        }
+    };
+    let text = if enabled {
+        RichText::new(label).color(Color32::WHITE).strong()
+    } else {
+        RichText::new(label)
+    };
+    ui.scope(|ui| {
+        ui.spacing_mut().item_spacing.x = 0.0;
+        let left = egui::CornerRadius {
+            nw: 3,
+            sw: 3,
+            ne: 0,
+            se: 0,
+        };
+        let right = egui::CornerRadius {
+            nw: 0,
+            sw: 0,
+            ne: 3,
+            se: 3,
+        };
+        let main = ui.add_enabled(enabled, style(egui::Button::new(text)).corner_radius(left));
+        let size = egui::vec2(20.0, main.rect.height());
+        let arrow = ui.add_enabled(
+            enabled,
+            style(egui::Button::new(""))
+                .min_size(size)
+                .corner_radius(right),
+        );
+        // the arrow has no text, so name it for screen readers
+        let name = format!("{label} options");
+        arrow.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, enabled, &name));
+        let arrow = arrow.on_hover_text(&name);
+        let c = arrow.rect.center();
+        let color = if enabled {
+            Color32::WHITE
+        } else {
+            ui.visuals().weak_text_color()
+        };
+        ui.painter().add(egui::Shape::convex_polygon(
+            vec![
+                c + egui::vec2(-4.0, -2.0),
+                c + egui::vec2(4.0, -2.0),
+                c + egui::vec2(0.0, 3.0),
+            ],
+            color,
+            Stroke::NONE,
+        ));
+        egui::Popup::menu(&arrow).show(menu);
+        main
+    })
+    .inner
+}
+
 pub fn bg_color() -> Color32 {
     bg()
 }
