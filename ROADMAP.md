@@ -4,7 +4,7 @@ A Rust (eframe/egui + wgpu) recreation of the observable features and look of Bu
 Built only from observable behaviour, no reverse engineering. Own name, no original logos/assets.
 
 Workspace: the app plus `server/` (`burpcraft-server`, self-hosted Collaborator + BApp Store, std only).
-Dev loop: `cargo test --workspace`, `python3 e2e.py` (local HTTP + WebSocket servers through the running proxy), then `OUT=/path/shot ./shot.sh <MainTab> [ProxyTab]` to render a screen
+Dev loop: `cargo test --workspace`, `python3 e2e.py` (local HTTP + WebSocket servers through the running proxy), `python3 e2e_scan.py --launch target/debug/burpcraft` (vulnerable local app with safe twins; scanner, OpenAPI, auth, passive, Intruder, Collaborator, send and intercept over REST/MCP; PASS/FAIL table), then `OUT=/path/shot ./shot.sh <MainTab> [ProxyTab]` to render a screen
 into `<OUT>.png` with sample traffic (uses the BURPCRAFT_SHOT / BURPCRAFT_TAB dev hooks).
 
 ## Done (iteration 1)
@@ -47,9 +47,13 @@ into `<OUT>.png` with sample traffic (uses the BURPCRAFT_SHOT / BURPCRAFT_TAB de
 ## Not covered (larger efforts, decide before starting)
 - [ ] Native fallback render: no JavaScript (needs a JS engine + DOM; the Chromium engine covers it), no floats/positioning, flex/grid are equal-width columns only
 - [ ] Scanner: no stored XSS, DOM checks only via DOM Invader, no XXE checks; request smuggling is timing-only (no obfuscated Transfer-Encoding variants, no H2 downgrade, no differential confirmation)
-- [ ] API scanning: JSON definitions only (no YAML); BChecks: subset of the original syntax (no loops, variables, `run for each`)
+- [ ] BChecks: subset of the original syntax (no loops, variables, `run for each`)
 - [ ] BurpCraft AI: a live answer was not exercised on the dev machine (no Anthropic API key there)
 - [ ] Project files are written on save/exit, not continuously like a disk-based project
+- [ ] Scanner: crawler/audit responses are not passively scanned (only proxied traffic is); header insertion points are only User-Agent and Referer
+- [ ] Scanner: Target scope is not applied (a scan stays on the origins it is given; the crawler is same-origin); delay/rate limit only in the New scan dialog, not over REST/MCP
+- [ ] REST API `/v0.1/scan`: no API definition, authentication, threads or delay fields (MCP `scan_start` has openapi/headers/login)
+- [ ] HTTP client buffers whole bodies in memory (no size cap on a real multi-GB response)
 
 ## Done (iteration 4): Pro features
 Everything in the table below is implemented; see the per-row notes. Self-hosting:
@@ -77,7 +81,7 @@ Status: ✅ done · 🟡 partial · ❌ missing
 | Scan configurations | Fast/thorough profiles, chosen checks, rate limits | ✅ New scan dialog: Fast/Thorough, per-check toggles, pages, threads, delay |
 | Live tasks | Automatic audit (passive or active) of traffic as it passes the proxy | ✅ passive always; "New live task" = active audit of in-scope proxied requests |
 | BChecks | Custom scan checks in a small declarative language | ✅ subset of the syntax: given response/host/insertion point, send payload/request, matches/in/is with and/or/not; editor in Extensions → BChecks |
-| API-definition scanning | Import OpenAPI/Swagger and scan the endpoints | ✅ OpenAPI 3 / Swagger 2 JSON (no YAML) |
+| API-definition scanning | Import OpenAPI/Swagger and scan the endpoints | ✅ OpenAPI 3 / Swagger 2, JSON or YAML |
 | Authenticated scanning | Recorded login or credentials used during crawl/audit | ✅ extra headers + raw login request whose cookies join every request |
 | Reports | Export issues as HTML/XML | ✅ Dashboard "Report (HTML)" / "Export (XML)", with request/response evidence, in ~/.burpcraft/reports |
 | Project files | Save/reopen all state on disk: history, site map, Repeater, issues, settings | ✅ Project menu Open/Save/Save as, Ctrl+S, `burpcraft <file>`, saved on exit (gzip, own format) |

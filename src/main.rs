@@ -412,10 +412,10 @@ impl App {
                 ui.add(egui::TextEdit::multiline(&mut cfg.login).code_editor().desired_rows(4).desired_width(f32::INFINITY));
             });
             ui.collapsing("API definition", |ui| {
-                ui.label("OpenAPI / Swagger JSON file to audit every operation of:");
+                ui.label("OpenAPI / Swagger file (JSON or YAML) to audit every operation of:");
                 ui.add(
                     egui::TextEdit::singleline(&mut api)
-                        .hint_text("/path/to/openapi.json")
+                        .hint_text("/path/to/openapi.yaml")
                         .desired_width(f32::INFINITY),
                 );
             });

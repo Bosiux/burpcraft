@@ -54,6 +54,17 @@ pub fn header(msg: &str, name: &str) -> Option<String> {
         .map(|(_, v)| v.trim().to_string())
 }
 
+/// Appends exactly `n` bytes. Grows with the data actually read: a forged Content-Length or chunk
+/// size from the peer must not over-allocate (abort) or overflow the offset (panic).
+fn read_n<R: Read>(r: &mut R, out: &mut Vec<u8>, n: usize) -> io::Result<()> {
+    let want = out.len().saturating_add(n);
+    r.take(n as u64).read_to_end(out)?;
+    if out.len() < want {
+        return Err(io::ErrorKind::UnexpectedEof.into());
+    }
+    Ok(())
+}
+
 /// Reads exactly one HTTP message (head + body), honouring its framing, and returns the raw bytes.
 pub fn read_message<R: BufRead>(
     r: &mut R,
@@ -107,16 +118,12 @@ pub fn read_message<R: BufRead>(
                 }
                 break;
             }
-            let s = out.len();
-            out.resize(s + size, 0);
-            r.read_exact(&mut out[s..])?;
+            read_n(r, &mut out, size)?;
             r.read_until(b'\n', &mut out)?;
         }
     } else if let Some(len) = header(&head, "content-length").and_then(|v| v.parse::<usize>().ok())
     {
-        let s = out.len();
-        out.resize(s + len, 0);
-        r.read_exact(&mut out[s..])?;
+        read_n(r, &mut out, len)?;
     } else if is_response {
         // close-delimited body; servers often skip TLS close_notify, so a truncation EOF is fine
         if let Err(e) = r.read_to_end(&mut out)
@@ -391,6 +398,14 @@ mod tests {
         let raw = b"POST / HTTP/1.1\r\nContent-Length: 2\r\n\r\nhiGET";
         let m = read_message(&mut BufReader::new(&raw[..]), false, false).unwrap();
         assert!(m.ends_with(b"\r\n\r\nhi"));
+        // forged sizes from a hostile peer: an error, not an abort or an overflow panic
+        for raw in [
+            &b"HTTP/1.1 200 OK\r\nContent-Length: 999999999999999\r\n\r\nshort"[..],
+            b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\nab\r\nabc\r\n0\r\n\r\n",
+            b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n2\r\nab\r\nffffffffffffffff\r\nabc",
+        ] {
+            assert!(read_message(&mut BufReader::new(raw), true, false).is_err());
+        }
         assert_eq!(
             header("GET / HTTP/1.1\r\nHost: a.b\r\n\r\n", "host").as_deref(),
             Some("a.b")

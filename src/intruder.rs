@@ -708,6 +708,8 @@ impl Intruder {
                                 r.primary.index.0.max(r.secondary.index.0),
                             );
                             let chars: Vec<char> = t.template.chars().collect();
+                            // the saved cursor can outlive a shorter template (Clear §, paste)
+                            let (a, b) = (a.min(chars.len()), b.min(chars.len()));
                             let mut s: String = chars[..a].iter().collect();
                             s.push(MARK);
                             s.extend(&chars[a..b]);

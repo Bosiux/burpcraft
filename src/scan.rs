@@ -635,14 +635,14 @@ fn audit_point(c: &Ctx, req: &str, p: &Point, base: &(Vec<u8>, Duration)) {
         for pl in ["{{7*7191}}", "${7*7191}", "<%= 7*7191 %>", "#{7*7191}"] {
             let r = inject(req, p, pl);
             if let Some((resp, _)) = c.send(&r)
-                && body_text(&resp).contains("51337")
-                && !base_body.contains("51337")
+                && body_text(&resp).contains("50337") // 7*7191
+                && !base_body.contains("50337")
             {
                 c.report(
                     "Server-side template injection",
                     Severity::High,
                     "Firm",
-                    format!("The {lab} is evaluated by a template engine: `{pl}` produced 51337."),
+                    format!("The {lab} is evaluated by a template engine: `{pl}` produced 50337."),
                     &r,
                     &resp,
                 );
@@ -1217,7 +1217,12 @@ mod tests {
                         }
                         "/file" => html(if arg("name").contains("etc/passwd") { "root:x:0:0:root:/root:/bin/bash".into() } else { "file contents".into() }),
                         "/go" => ("302 Found", vec![("Location", arg("url"))], String::new()),
-                        "/tpl" => html(format!("Hello {}", if arg("name").contains("{{7*7191}}") { "51337".into() } else { arg("name") })),
+                        "/tpl" => {
+                            // evaluates `{{a*b}}` like a real engine, so a wrong expected product fails
+                            let n = arg("name");
+                            let v = n.strip_prefix("{{").and_then(|e| e.strip_suffix("}}")).and_then(|e| e.split_once('*')).and_then(|(a, b)| Some(a.parse::<u64>().ok()? * b.parse::<u64>().ok()?));
+                            html(format!("Hello {}", v.map_or(n, |v| v.to_string())))
+                        }
                         "/fetch" => {
                             // SSRF: fetches http URLs given in `u`
                             if let Some(rest) = arg("u").strip_prefix("http://") {
