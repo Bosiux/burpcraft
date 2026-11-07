@@ -3,7 +3,7 @@
 //!
 //!   POST /v0.1/scan            {"urls": ["http://t/"], "scan_configurations": [{"name": "thorough"}], "crawl": true,
 //!                               "scope": {"include": [{"rule": "http://t/"}], "exclude": [{"rule": "http://t/logout"}]},
-//!                               "request", "target", "openapi", "headers", "login", "threads", "delay_ms"}
+//!                               "request", "target", "openapi", "headers", "login", "logged_out", "threads", "delay_ms"}
 //!                              -> 201 Created, Location: <task id>   (same fields as MCP `scan_start`)
 //!   GET  /v0.1/scan/<id>       -> {"task_id", "scan_status", "scan_metrics": {...}, "issue_events": [...]}
 //!   GET  /v0.1/issues          -> every issue found so far (passive and active)
@@ -313,5 +313,10 @@ mod tests {
             "{body}"
         );
         assert_eq!(req(r#"{"crawl": true}"#).0, "400 Bad Request");
+        let (st, _, body) = req(r#"{"urls": ["http://127.0.0.1:9/"], "logged_out": "("}"#);
+        assert!(
+            st == "400 Bad Request" && body.contains("bad logged_out regex"),
+            "{body}"
+        );
     }
 }

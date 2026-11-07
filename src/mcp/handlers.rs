@@ -495,6 +495,10 @@ pub(crate) fn start_scan(
     cfg.crawl = bool_arg(a, "crawl").unwrap_or(extra.is_empty());
     cfg.headers = str_arg(a, "headers").unwrap_or("").into();
     cfg.login = str_arg(a, "login").unwrap_or("").into();
+    cfg.logged_out = str_arg(a, "logged_out").unwrap_or("").into();
+    if let Err(e) = regex::Regex::new(&cfg.logged_out) {
+        return Err(format!("bad logged_out regex: {e}"));
+    }
     if let Some(t) = num_arg(a, "threads") {
         cfg.threads = t.clamp(1, 64) as usize;
     }

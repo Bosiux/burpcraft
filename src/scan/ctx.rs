@@ -48,7 +48,13 @@ pub(crate) struct Ctx {
     pub(crate) scope: Scope,
     /// Requests not sent because they were out of scope.
     pub(crate) skipped: Arc<AtomicUsize>,
+    /// Compiled `cfg.logged_out`, and the number of re-logins so far (serialises them).
+    pub(crate) logged_out: Option<regex::Regex>,
+    pub(crate) relogins: Mutex<usize>,
 }
+
+/// Re-logins per target before giving up (a login that never sticks must not loop forever).
+const MAX_RELOGINS: usize = 20;
 
 pub fn parse_url(url: &str) -> Option<(Target, String)> {
     let (tls, rest) = if let Some(r) = url.strip_prefix("https://") {
@@ -119,8 +125,64 @@ impl Ctx {
         url_in_scope(&self.scope.lock().unwrap(), &url, true)
     }
 
-    /// Adds auth headers/cookies, sends, logs; None when stopped, out of scope or on a network error.
+    /// Sends the login request and keeps its Set-Cookie values for every later request.
+    pub(crate) fn login(&self) {
+        let login = crate::tools::fix_content_length(
+            &self.cfg.login.replace("\r\n", "\n").replace('\n', "\r\n"),
+        );
+        if let Some((resp, _)) = self.send_once(&login) {
+            let set: Vec<String> = String::from_utf8_lossy(proxy::head(&resp))
+                .lines()
+                .filter_map(|l| {
+                    l.split_once(':')
+                        .filter(|(k, _)| k.eq_ignore_ascii_case("set-cookie"))
+                        .map(|(_, v)| v.trim().split(';').next().unwrap_or("").to_string())
+                })
+                .collect();
+            *self.cookies.lock().unwrap() = set.join("; ");
+        }
+    }
+
+    fn is_logged_out(&self, resp: &[u8]) -> bool {
+        if let Some(re) = &self.logged_out {
+            return re.is_match(&String::from_utf8_lossy(resp));
+        }
+        let status = proxy::status_of(resp);
+        let loc = crate::http::net::header(&String::from_utf8_lossy(proxy::head(resp)), "location")
+            .unwrap_or_default()
+            .to_ascii_lowercase();
+        status == 401
+            || ((300..400).contains(&status) && (loc.contains("login") || loc.contains("signin")))
+    }
+
+    /// Like `send_once`, but when a login is configured and the response says the session
+    /// expired, logs in again (once for all threads) and retries the request.
     pub(crate) fn send(&self, req: &str) -> Option<(Vec<u8>, Duration)> {
+        let sent_with = self.cookies.lock().unwrap().clone();
+        let r = self.send_once(req)?;
+        if self.cfg.login.trim().is_empty() || !self.is_logged_out(&r.0) {
+            return Some(r);
+        }
+        {
+            let mut n = self.relogins.lock().unwrap();
+            // another thread may have refreshed the session meanwhile: just retry
+            if *self.cookies.lock().unwrap() == sent_with {
+                if *n >= MAX_RELOGINS {
+                    return Some(r);
+                }
+                *n += 1;
+                self.login();
+                self.state.lock().unwrap().event(
+                    "Scanner",
+                    format!("Task {}: session expired, logged in again", self.task),
+                );
+            }
+        }
+        self.send_once(req).or(Some(r))
+    }
+
+    /// Adds auth headers/cookies, sends, logs; None when stopped, out of scope or on a network error.
+    pub(crate) fn send_once(&self, req: &str) -> Option<(Vec<u8>, Duration)> {
         if self.stop.load(Ordering::SeqCst) {
             return None;
         }
