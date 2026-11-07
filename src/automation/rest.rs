@@ -313,5 +313,10 @@ mod tests {
             "{body}"
         );
         assert_eq!(req(r#"{"crawl": true}"#).0, "400 Bad Request");
+        let (st, _, body) = req(r#"{"urls": ["http://127.0.0.1:9/"], "logged_out": "("}"#);
+        assert!(
+            st == "400 Bad Request" && body.contains("bad logged_out regex"),
+            "{body}"
+        );
     }
 }
