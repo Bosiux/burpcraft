@@ -502,9 +502,22 @@ pub(crate) fn start_scan(
     if let Some(d) = num_arg(a, "delay_ms") {
         cfg.delay_ms = d.clamp(0, 60_000) as u64;
     }
-    // a per-scan scope can only narrow the Target scope: its include rules must already be in
-    // scope, Target excludes still apply, and with no include rule the Target ones are kept
-    let scope = match a.get("scope") {
+    let scope = scan_scope(a.get("scope"), scope)?;
+    if let Some(u) = scan::out_of_scope(&scope, &urls, &extra) {
+        return Err(format!("{u} is outside the scan scope"));
+    }
+    let mut t = tasks.lock().unwrap();
+    let id = t.len() + 1;
+    t.push(scan::start(id, urls, extra, cfg, state.clone(), scope));
+    Ok(id)
+}
+
+/// A per-scan scope narrows the Target scope: includes must lie inside it, its excludes still apply.
+fn scan_scope(
+    sc: Option<&J>,
+    scope: &crate::tools::target::Scope,
+) -> Result<crate::tools::target::Scope, String> {
+    match sc {
         Some(sc @ J::Obj(_)) => {
             let rules = |k: &str, include: bool| -> Vec<(bool, bool, String)> {
                 match sc.get(k) {
@@ -526,16 +539,9 @@ pub(crate) fn start_scan(
             }
             r.extend(outer.iter().filter(|(on, inc, _)| *on && !*inc).cloned());
             r.extend(rules("exclude", false));
-            std::sync::Arc::new(std::sync::Mutex::new(r))
+            Ok(std::sync::Arc::new(std::sync::Mutex::new(r)))
         }
-        Some(_) => return Err("`scope` must be an object".into()),
-        None => scope.clone(),
-    };
-    if let Some(u) = scan::out_of_scope(&scope, &urls, &extra) {
-        return Err(format!("{u} is outside the scan scope"));
+        Some(_) => Err("`scope` must be an object".into()),
+        None => Ok(scope.clone()),
     }
-    let mut t = tasks.lock().unwrap();
-    let id = t.len() + 1;
-    t.push(scan::start(id, urls, extra, cfg, state.clone(), scope));
-    Ok(id)
 }
