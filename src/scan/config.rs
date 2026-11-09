@@ -27,6 +27,9 @@ pub struct Config {
     pub headers: String,
     /// Raw login request sent before the scan; its Set-Cookie values join every request.
     pub login: String,
+    /// Regex over a response meaning "logged out" (re-runs `login` and retries); empty = a 401,
+    /// or a redirect to a login/signin URL.
+    pub logged_out: String,
 }
 
 impl Config {
@@ -42,6 +45,7 @@ impl Config {
             delay_ms: 0,
             headers: String::new(),
             login: String::new(),
+            logged_out: String::new(),
         }
     }
     pub fn thorough() -> Self {

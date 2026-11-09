@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use crate::proxy::{self, State};
+use crate::proxy::State;
 use crate::security::scanner::Severity;
 use crate::tools::target::{Scope, url_in_scope};
 
@@ -120,23 +120,14 @@ pub fn start(
                 stored_left: AtomicUsize::new(STORED_REFETCH_BUDGET),
                 scope: scope.clone(),
                 skipped: skipped.clone(),
+                logged_out: (!cfg.logged_out.trim().is_empty())
+                    .then(|| regex::Regex::new(&cfg.logged_out).ok())
+                    .flatten(),
+                relogins: Mutex::default(),
             });
             if !cfg.login.trim().is_empty() {
                 *status.lock().unwrap() = "Logging in".into();
-                let login = crate::tools::fix_content_length(
-                    &cfg.login.replace("\r\n", "\n").replace('\n', "\r\n"),
-                );
-                if let Some((resp, _)) = c.send(&login) {
-                    let set: Vec<String> = String::from_utf8_lossy(proxy::head(&resp))
-                        .lines()
-                        .filter_map(|l| {
-                            l.split_once(':')
-                                .filter(|(k, _)| k.eq_ignore_ascii_case("set-cookie"))
-                                .map(|(_, v)| v.trim().split(';').next().unwrap_or("").to_string())
-                        })
-                        .collect();
-                    *c.cookies.lock().unwrap() = set.join("; ");
-                }
+                c.login();
             }
             ctxs.push(c.clone());
             c
@@ -257,6 +248,7 @@ pub fn start(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::proxy;
     use std::io::{BufRead, BufReader, Read, Write};
 
     #[test]
@@ -500,6 +492,82 @@ mod tests {
                 .lock()
                 .unwrap()
                 .contains("out-of-scope requests skipped")
+        );
+    }
+
+    #[test]
+    fn expired_session_triggers_relogin() {
+        // each session cookie works once; after that the app redirects to /login.
+        // /admin* answers 401 even when logged in: re-logins there do not help
+        let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = l.local_addr().unwrap().port();
+        let (logins, authed) = (Arc::new(AtomicUsize::new(0)), Arc::new(AtomicUsize::new(0)));
+        let (lg, au) = (logins.clone(), authed.clone());
+        std::thread::spawn(move || {
+            let used = Mutex::new(std::collections::HashSet::new());
+            for mut c in l.incoming().flatten() {
+                let mut r = BufReader::new(c.try_clone().unwrap());
+                let (mut first, mut h, mut sid) = (String::new(), String::new(), String::new());
+                r.read_line(&mut first).unwrap();
+                while r.read_line(&mut h).is_ok_and(|n| n > 2) {
+                    if let Some(v) = h.strip_prefix("Cookie: sid=") {
+                        sid = v.trim().to_string();
+                    }
+                    h.clear();
+                }
+                let resp = if first.starts_with("GET /admin") {
+                    "HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\n\r\n".into()
+                } else if first.starts_with("POST /login") {
+                    let n = lg.fetch_add(1, Ordering::SeqCst);
+                    format!(
+                        "HTTP/1.1 200 OK\r\nSet-Cookie: sid=s{n}; Path=/\r\nContent-Length: 0\r\n\r\n"
+                    )
+                } else if !sid.is_empty() && used.lock().unwrap().insert(sid) {
+                    au.fetch_add(1, Ordering::SeqCst);
+                    "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok".into()
+                } else {
+                    "HTTP/1.1 302 Found\r\nLocation: /login\r\nContent-Length: 0\r\n\r\n".into()
+                };
+                let _ = c.write_all(resp.as_bytes());
+            }
+        });
+        let t = Target {
+            host: "127.0.0.1".into(),
+            port,
+            tls: false,
+        };
+        let mut cfg = Config::fast();
+        cfg.checks = [false; CHECKS.len()];
+        cfg.checks[5] = true; // open redirection: a handful of requests on one point
+        cfg.threads = 1;
+        cfg.login = "POST /login HTTP/1.1\nHost: x\n\n".into();
+        let task = start(
+            1,
+            vec![],
+            (0..8)
+                .flat_map(|i| {
+                    [
+                        (t.clone(), get_request(&t, &format!("/admin{i}?q=1"))),
+                        (t.clone(), get_request(&t, &format!("/account{i}?q=1"))),
+                    ]
+                })
+                .collect(),
+            cfg,
+            proxy::Shared::new(),
+            Default::default(),
+        );
+        for _ in 0..1500 {
+            if task.done.load(Ordering::SeqCst) {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        let (l, a) = (logins.load(Ordering::SeqCst), authed.load(Ordering::SeqCst));
+        // without re-login only the first request after each login would be authenticated, and
+        // useless re-logins on /admin* must not use up the budget for the real expiries
+        assert!(
+            l > MAX_RELOGINS + 1 && a > MAX_RELOGINS,
+            "logins {l}, authenticated {a}"
         );
     }
 
