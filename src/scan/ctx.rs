@@ -48,13 +48,14 @@ pub(crate) struct Ctx {
     pub(crate) scope: Scope,
     /// Requests not sent because they were out of scope.
     pub(crate) skipped: Arc<AtomicUsize>,
-    /// Compiled `cfg.logged_out`, and the number of re-logins so far (serialises them).
+    /// Compiled `cfg.logged_out`, and consecutive re-logins that did not help (serialises them).
     pub(crate) logged_out: Option<regex::Regex>,
     pub(crate) relogins: Mutex<usize>,
 }
 
-/// Re-logins per target before giving up (a login that never sticks must not loop forever).
-const MAX_RELOGINS: usize = 20;
+/// Consecutive useless re-logins before giving up: a login that never sticks, or endpoints that
+/// answer 401 even when logged in, must not double the traffic for the whole scan.
+pub(crate) const MAX_RELOGINS: usize = 20;
 
 pub fn parse_url(url: &str) -> Option<(Target, String)> {
     let (tls, rest) = if let Some(r) = url.strip_prefix("https://") {
@@ -178,7 +179,12 @@ impl Ctx {
                 );
             }
         }
-        self.send_once(req).or(Some(r))
+        let retry = self.send_once(req);
+        if retry.as_ref().is_some_and(|(b, _)| !self.is_logged_out(b)) {
+            // a real expiry: the budget only counts re-logins that did not help
+            *self.relogins.lock().unwrap() = 0;
+        }
+        retry.or(Some(r))
     }
 
     /// Adds auth headers/cookies, sends, logs; None when stopped, out of scope or on a network error.

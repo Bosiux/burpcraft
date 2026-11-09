@@ -497,7 +497,8 @@ mod tests {
 
     #[test]
     fn expired_session_triggers_relogin() {
-        // each session cookie works once; after that the app redirects to /login
+        // each session cookie works once; after that the app redirects to /login.
+        // /admin* answers 401 even when logged in: re-logins there do not help
         let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let port = l.local_addr().unwrap().port();
         let (logins, authed) = (Arc::new(AtomicUsize::new(0)), Arc::new(AtomicUsize::new(0)));
@@ -514,7 +515,9 @@ mod tests {
                     }
                     h.clear();
                 }
-                let resp = if first.starts_with("POST /login") {
+                let resp = if first.starts_with("GET /admin") {
+                    "HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\n\r\n".into()
+                } else if first.starts_with("POST /login") {
                     let n = lg.fetch_add(1, Ordering::SeqCst);
                     format!(
                         "HTTP/1.1 200 OK\r\nSet-Cookie: sid=s{n}; Path=/\r\nContent-Length: 0\r\n\r\n"
@@ -541,20 +544,31 @@ mod tests {
         let task = start(
             1,
             vec![],
-            vec![(t.clone(), get_request(&t, "/account?q=1"))],
+            (0..8)
+                .flat_map(|i| {
+                    [
+                        (t.clone(), get_request(&t, &format!("/admin{i}?q=1"))),
+                        (t.clone(), get_request(&t, &format!("/account{i}?q=1"))),
+                    ]
+                })
+                .collect(),
             cfg,
             proxy::Shared::new(),
             Default::default(),
         );
-        for _ in 0..500 {
+        for _ in 0..1500 {
             if task.done.load(Ordering::SeqCst) {
                 break;
             }
             std::thread::sleep(Duration::from_millis(20));
         }
         let (l, a) = (logins.load(Ordering::SeqCst), authed.load(Ordering::SeqCst));
-        // without re-login only the first request after the login would be authenticated
-        assert!(l > 2 && a >= l, "logins {l}, authenticated {a}");
+        // without re-login only the first request after each login would be authenticated, and
+        // useless re-logins on /admin* must not use up the budget for the real expiries
+        assert!(
+            l > MAX_RELOGINS + 1 && a > MAX_RELOGINS,
+            "logins {l}, authenticated {a}"
+        );
     }
 
     #[test]
