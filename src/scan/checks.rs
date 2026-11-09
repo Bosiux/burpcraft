@@ -160,7 +160,14 @@ fn audit_point(c: &Ctx, req: &str, p: &Point, base: &(Vec<u8>, Duration)) {
             c.report("Cross-site scripting (reflected)", Severity::High, "Firm", format!("The value of the {lab} is copied into the response without HTML encoding: `{pl}` came back unchanged."), &r, &resp);
         }
     }
-    if c.cfg.on("Cross-site scripting (stored)") {
+    // stored values come from params and bodies; path segments and arbitrary headers would
+    // drain the shared refetch budget before the points that matter get a turn
+    let stored_candidate = match p.kind {
+        Kind::Path => false,
+        Kind::Header => ["user-agent", "referer"].contains(&p.name.to_ascii_lowercase().as_str()),
+        _ => true,
+    };
+    if c.cfg.on("Cross-site scripting (stored)") && stored_candidate {
         let tk = format!("bcs{}{}", p.start, token());
         let pl = format!("{tk}<b>{tk}");
         let r = inject(req, p, &pl);
