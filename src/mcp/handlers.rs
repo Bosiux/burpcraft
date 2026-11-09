@@ -7,6 +7,7 @@ use std::time::Instant;
 
 use crate::automation::openapi::{self, J};
 use crate::proxy::{self, Entry, Rule};
+use crate::tools::target::url_in_scope;
 use crate::{http::codec, http::net, scan, security::collab};
 
 use super::Ctx;
@@ -319,50 +320,7 @@ pub(crate) fn call(name: &str, a: &J, ctx: &Ctx) -> Result<J, String> {
             ))
         }
         "scan_start" => {
-            let mut urls = a.get("urls").map(strs).unwrap_or_default();
-            if urls.iter().any(|u| scan::parse_url(u).is_none()) {
-                return Err("`urls` must be absolute http(s) URLs".into());
-            }
-            let mut extra = match str_arg(a, "request") {
-                Some(r) => {
-                    let r = raw(r);
-                    vec![(target(a, &r)?, r)]
-                }
-                None => vec![],
-            };
-            if let Some(doc) = str_arg(a, "openapi") {
-                // as in the New scan dialog: the URL is the API base, not a crawl start
-                let base = urls.first().cloned();
-                extra.extend(openapi::requests(
-                    &openapi::parse_any(doc)?,
-                    base.as_deref(),
-                )?);
-                urls.clear();
-            }
-            if urls.is_empty() && extra.is_empty() {
-                return Err("give `urls` or `request`".into());
-            }
-            let mut cfg = if bool_arg(a, "thorough") == Some(true) {
-                scan::Config::thorough()
-            } else {
-                scan::Config::fast()
-            };
-            cfg.crawl = bool_arg(a, "crawl").unwrap_or(extra.is_empty());
-            cfg.headers = str_arg(a, "headers").unwrap_or("").into();
-            cfg.login = str_arg(a, "login").unwrap_or("").into();
-            if let Some(u) = scan::out_of_scope(&ctx.scope, &urls, &extra) {
-                return Err(format!("{u} is outside the Target scope"));
-            }
-            let mut t = ctx.tasks.lock().unwrap();
-            let id = t.len() + 1;
-            t.push(scan::start(
-                id,
-                urls,
-                extra,
-                cfg,
-                ctx.state.clone(),
-                ctx.scope.clone(),
-            ));
+            let id = start_scan(a, &ctx.tasks, &ctx.state, &ctx.scope)?;
             Ok(obj(vec![("task_id", n(id))]))
         }
         "scan_status" => {
@@ -493,5 +451,97 @@ fn rest_get(path: &str, ctx: &Ctx) -> Result<J, String> {
         Ok(j)
     } else {
         Err(body)
+    }
+}
+
+/// Starts a scan from JSON arguments; shared by MCP `scan_start` and REST `POST /v0.1/scan`.
+/// A Burp-style `scope` object ({"include":[{"rule":prefix}],"exclude":[...]}) narrows the
+/// Target scope for this scan only; it never widens it.
+pub(crate) fn start_scan(
+    a: &J,
+    tasks: &crate::automation::rest::Tasks,
+    state: &proxy::State,
+    scope: &crate::tools::target::Scope,
+) -> Result<usize, String> {
+    let mut urls = a.get("urls").map(strs).unwrap_or_default();
+    if urls.iter().any(|u| scan::parse_url(u).is_none()) {
+        return Err("`urls` must be absolute http(s) URLs".into());
+    }
+    let mut extra = match str_arg(a, "request") {
+        Some(r) => {
+            let r = raw(r);
+            vec![(target(a, &r)?, r)]
+        }
+        None => vec![],
+    };
+    if let Some(doc) = str_arg(a, "openapi") {
+        // as in the New scan dialog: the URL is the API base, not a crawl start
+        let base = urls.first().cloned();
+        extra.extend(openapi::requests(
+            &openapi::parse_any(doc)?,
+            base.as_deref(),
+        )?);
+        urls.clear();
+    }
+    if urls.is_empty() && extra.is_empty() {
+        return Err("give `urls`, `request` or `openapi`".into());
+    }
+    // Burp REST style: scan_configurations [{"name": "...thorough..."}]
+    let named_thorough = matches!(a.get("scan_configurations"), Some(J::Arr(v)) if v.iter().any(|c| str_arg(c, "name").is_some_and(|n| n.to_ascii_lowercase().contains("thorough"))));
+    let mut cfg = if bool_arg(a, "thorough") == Some(true) || named_thorough {
+        scan::Config::thorough()
+    } else {
+        scan::Config::fast()
+    };
+    cfg.crawl = bool_arg(a, "crawl").unwrap_or(extra.is_empty());
+    cfg.headers = str_arg(a, "headers").unwrap_or("").into();
+    cfg.login = str_arg(a, "login").unwrap_or("").into();
+    if let Some(t) = num_arg(a, "threads") {
+        cfg.threads = t.clamp(1, 64) as usize;
+    }
+    if let Some(d) = num_arg(a, "delay_ms") {
+        cfg.delay_ms = d.clamp(0, 60_000) as u64;
+    }
+    let scope = scan_scope(a.get("scope"), scope)?;
+    if let Some(u) = scan::out_of_scope(&scope, &urls, &extra) {
+        return Err(format!("{u} is outside the scan scope"));
+    }
+    let mut t = tasks.lock().unwrap();
+    let id = t.len() + 1;
+    t.push(scan::start(id, urls, extra, cfg, state.clone(), scope));
+    Ok(id)
+}
+
+/// A per-scan scope narrows the Target scope: includes must lie inside it, its excludes still apply.
+fn scan_scope(
+    sc: Option<&J>,
+    scope: &crate::tools::target::Scope,
+) -> Result<crate::tools::target::Scope, String> {
+    match sc {
+        Some(sc @ J::Obj(_)) => {
+            let rules = |k: &str, include: bool| -> Vec<(bool, bool, String)> {
+                match sc.get(k) {
+                    Some(J::Arr(v)) => v
+                        .iter()
+                        .filter_map(|r| str_arg(r, "rule"))
+                        .map(|p| (true, include, p.to_string()))
+                        .collect(),
+                    _ => vec![],
+                }
+            };
+            let outer = scope.lock().unwrap().clone();
+            let mut r = rules("include", true);
+            if let Some((_, _, p)) = r.iter().find(|(_, _, p)| !url_in_scope(&outer, p, true)) {
+                return Err(format!("scope rule {p} is outside the Target scope"));
+            }
+            if r.is_empty() {
+                r.extend(outer.iter().filter(|(on, inc, _)| *on && *inc).cloned());
+            }
+            r.extend(outer.iter().filter(|(on, inc, _)| *on && !*inc).cloned());
+            r.extend(rules("exclude", false));
+            Ok(std::sync::Arc::new(std::sync::Mutex::new(r)))
+        }
+        Some(_) => Err("`scope` must be an object".into()),
+        None => Ok(scope.clone()),
     }
 }

@@ -18,6 +18,7 @@ mod server;
 mod tests;
 
 use handlers::call;
+pub(crate) use handlers::start_scan;
 use helpers::{n, obj, s, str_arg};
 pub use server::start;
 
@@ -101,7 +102,7 @@ const TOOLS: &[(&str, &str, &str)] = &[
     (
         "scan_start",
         "Start an active scan in the background. Either urls (crawl + audit), one raw request + target (audit its parameters), or openapi (audit every operation; urls[0] overrides its server). headers/login authenticate every request. Returns task_id for scan_status.",
-        r#"{"type":"object","properties":{"urls":{"type":"array","items":{"type":"string"}},"request":{"type":"string"},"target":{"type":"string"},"openapi":{"type":"string","description":"OpenAPI 3 / Swagger 2 definition, JSON or YAML text"},"headers":{"type":"string","description":"extra `Name: value` lines on every request"},"login":{"type":"string","description":"raw login request sent first; its cookies join every request"},"thorough":{"type":"boolean"},"crawl":{"type":"boolean","description":"default true"}}}"#,
+        r#"{"type":"object","properties":{"urls":{"type":"array","items":{"type":"string"}},"request":{"type":"string"},"target":{"type":"string"},"openapi":{"type":"string","description":"OpenAPI 3 / Swagger 2 definition, JSON or YAML text"},"headers":{"type":"string","description":"extra `Name: value` lines on every request"},"login":{"type":"string","description":"raw login request sent first; its cookies join every request"},"thorough":{"type":"boolean"},"crawl":{"type":"boolean","description":"default true"},"threads":{"type":"integer","description":"concurrent requests, default 6"},"delay_ms":{"type":"integer","description":"pause before each request"},"scope":{"type":"object","description":"this scan only, narrows the Target scope: {include:[{rule:prefix}], exclude:[{rule:prefix}]}"}}}"#,
     ),
     (
         "scan_status",

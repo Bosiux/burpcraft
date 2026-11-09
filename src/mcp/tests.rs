@@ -331,7 +331,7 @@ fn scan_start_refuses_out_of_scope() {
         .push((true, true, "http://in.test/".into()));
     let (r, err) = tool(&c, "scan_start", r#"{"urls":["http://out.test/"]}"#);
     assert!(
-        err && format!("{r:?}").contains("outside the Target scope"),
+        err && format!("{r:?}").contains("outside the scan scope"),
         "{r:?}"
     );
     assert!(c.tasks.lock().unwrap().is_empty());
