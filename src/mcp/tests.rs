@@ -311,11 +311,12 @@ fn scan_start_openapi_with_auth() {
         sent.len() > 1 && sent[0].starts_with("POST /login "),
         "{sent:?}"
     );
-    // the definition's operation, not a crawl of the base URL, with the extra header
+    // the definition's operation (path segment fuzzed too), not a crawl, with the extra header
     assert!(
         sent.iter()
             .skip(1)
-            .all(|r| r.starts_with("GET /op?q=") && r.contains("\r\nX-T: 1\r\n"))
+            .all(|r| r.starts_with("GET /") && r.contains("?q=") && r.contains("\r\nX-T: 1\r\n")),
+        "{sent:?}"
     );
     let (r, err) = tool(&c, "scan_start", r#"{"openapi":"{}"}"#);
     assert!(err, "{r:?}");

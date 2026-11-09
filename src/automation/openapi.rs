@@ -546,7 +546,12 @@ mod tests {
                 && r[1].1.ends_with("\r\n\r\n{\"name\":\"bob\",\"age\":1}")
                 && r[1].1.contains("Content-Length: 22")
         );
-        assert_eq!(crate::scan::points(&r[1].1).len(), 3); // name, age, User-Agent
+        let kinds: Vec<_> = crate::scan::points(&r[1].1)
+            .into_iter()
+            .map(|p| (p.kind, p.name))
+            .filter(|(k, _)| *k != crate::scan::Kind::Path)
+            .collect();
+        assert_eq!(kinds.len(), 3, "{kinds:?}"); // name, age, User-Agent
 
         let sw = parse(SW2).unwrap();
         let r = requests(&sw, None).unwrap();
