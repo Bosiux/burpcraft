@@ -34,17 +34,22 @@ impl Default for Target {
     }
 }
 
+/// Whether `url` matches an enabled include rule (or, with `open_if_no_include`, there is none)
+/// and no enabled exclude rule.
+pub fn url_in_scope(rules: &[(bool, bool, String)], url: &str, open_if_no_include: bool) -> bool {
+    let m = |inc: bool| {
+        rules
+            .iter()
+            .any(|(on, i, p)| *on && *i == inc && url.starts_with(p.as_str()))
+    };
+    let open = open_if_no_include && !rules.iter().any(|(on, i, _)| *on && *i);
+    (open || m(true)) && !m(false)
+}
+
 impl Target {
     pub fn in_scope(&self, e: &Entry) -> bool {
         let url = format!("{}{}", e.origin(), e.url);
-        let m = |inc: bool| {
-            self.scope
-                .lock()
-                .unwrap()
-                .iter()
-                .any(|(on, i, p)| *on && *i == inc && url.starts_with(p.as_str()))
-        };
-        m(true) && !m(false)
+        url_in_scope(&self.scope.lock().unwrap(), &url, false)
     }
 
     pub fn add_to_scope(&mut self, e: &Entry) {
@@ -337,6 +342,11 @@ mod tests {
             .unwrap()
             .push((true, false, "https://a.com/admin".into()));
         assert!(!t.in_scope(&e));
+        // scans: no include rule means open, but excludes still apply
+        let ex = [(true, false, "https://a.com/admin".to_string())];
+        assert!(url_in_scope(&ex, "https://a.com/x", true));
+        assert!(!url_in_scope(&ex, "https://a.com/admin/x", true));
+        assert!(!url_in_scope(&ex, "https://a.com/x", false));
         t.selected = vec!["https://a.com".into(), "admin".into()];
         assert!(t.matches(&e));
     }
