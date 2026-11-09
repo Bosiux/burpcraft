@@ -30,6 +30,36 @@ mod tests {
     }
 
     #[test]
+    fn tool_traffic_is_passively_scanned() {
+        let state = Shared::new();
+        let resp = b"HTTP/1.1 200 OK\r\nServer: nginx/1.18.0\r\n\r\nhi";
+        let mut s = state.lock().unwrap();
+        for _ in 0..2 {
+            s.log_tool(
+                "Repeater",
+                "a.test",
+                80,
+                false,
+                b"GET /x HTTP/1.1\r\n\r\n",
+                resp,
+            );
+        }
+        let i = s
+            .issues
+            .iter()
+            .find(|i| i.name == "Server software version exposed")
+            .expect("passive issue from Repeater traffic");
+        assert_eq!(
+            (i.origin.as_str(), i.path.as_str()),
+            ("http://a.test", "/x")
+        );
+        // reported once, with the Repeater exchange kept as evidence
+        let ev: Vec<_> = s.history.iter().filter(|e| e.id == i.entry_id).collect();
+        assert!(ev.len() == 1 && ev[0].tool == "Repeater" && ev[0].resp == resp);
+        assert_eq!(s.history.len(), 1);
+    }
+
+    #[test]
     fn websocket_frames() {
         // masked "Hi" from client, then unmasked "ok" from server, then a partial frame
         let mut b = vec![

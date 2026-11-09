@@ -202,6 +202,9 @@ async fn exchange(host: &str, port: u16, p: Parsed) -> io::Result<Vec<u8>> {
         let chunk = chunk.map_err(io_err)?;
         let _ = body.flow_control().release_capacity(chunk.len());
         data.extend_from_slice(&chunk);
+        if data.len() > crate::http::net::max_message() {
+            return Err(crate::http::net::too_large(crate::http::net::max_message()));
+        }
     }
     let mut out = format!(
         "HTTP/2 {} {}\r\n",

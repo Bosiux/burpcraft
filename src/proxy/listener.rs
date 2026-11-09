@@ -275,17 +275,7 @@ fn serve<S: Stream>(
         found.extend(crate::security::bcheck::passive(&entry));
         crate::ext::on_response(&entry);
         if !found.is_empty() {
-            let mut s = state.lock().unwrap();
-            for mut i in found {
-                if !s
-                    .issues
-                    .iter()
-                    .any(|x| x.name == i.name && x.origin == i.origin && x.path == i.path)
-                {
-                    i.id = s.issues.len() + 1;
-                    s.issues.push(i);
-                }
-            }
+            state.lock().unwrap().add_issues(found, None);
         }
         if entry.mime() == "image" || entry.mime() == "SVG" {
             images().lock().unwrap().insert(
