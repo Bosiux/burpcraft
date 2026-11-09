@@ -65,8 +65,51 @@ fn read_n<R: Read>(r: &mut R, out: &mut Vec<u8>, n: usize) -> io::Result<()> {
     Ok(())
 }
 
+/// Largest HTTP message (head + body) kept in memory: `BURPCRAFT_MAX_MESSAGE_MB`, default 256.
+pub fn max_message() -> usize {
+    static MAX: OnceLock<usize> = OnceLock::new();
+    *MAX.get_or_init(|| {
+        std::env::var("BURPCRAFT_MAX_MESSAGE_MB")
+            .ok()
+            .and_then(|v| v.parse::<usize>().ok())
+            .unwrap_or(256)
+            .saturating_mul(1 << 20)
+    })
+}
+
+pub(crate) fn too_large(max: usize) -> io::Error {
+    io_err(format!(
+        "HTTP message larger than {} MB (BURPCRAFT_MAX_MESSAGE_MB)",
+        max >> 20
+    ))
+}
+
 /// Reads exactly one HTTP message (head + body), honouring its framing, and returns the raw bytes.
+/// Errors instead of buffering more than [`max_message`] bytes, so a hostile peer can't exhaust RAM.
 pub fn read_message<R: BufRead>(
+    r: &mut R,
+    is_response: bool,
+    head_request: bool,
+) -> io::Result<Vec<u8>> {
+    read_message_max(r, is_response, head_request, max_message())
+}
+
+fn read_message_max<R: BufRead>(
+    r: &mut R,
+    is_response: bool,
+    head_request: bool,
+    max: usize,
+) -> io::Result<Vec<u8>> {
+    // ponytail: oversized messages are an error, not spooled to disk; add spooling if real targets need it
+    let mut lim = Read::take(r, max as u64 + 1);
+    let res = read_framed(&mut lim, is_response, head_request);
+    if lim.limit() == 0 {
+        return Err(too_large(max));
+    }
+    res
+}
+
+fn read_framed<R: BufRead>(
     r: &mut R,
     is_response: bool,
     head_request: bool,
@@ -406,6 +449,18 @@ mod tests {
         ] {
             assert!(read_message(&mut BufReader::new(raw), true, false).is_err());
         }
+        // over the cap: an error for every framing, and never more than the cap buffered
+        for raw in [
+            &b"HTTP/1.1 200 OK\r\nContent-Length: 20\r\n\r\n01234567890123456789"[..],
+            b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n14\r\n01234567890123456789\r\n0\r\n\r\n",
+            b"HTTP/1.1 200 OK\r\n\r\n0123456789012345678901234567890123456789",
+            b"HTTP/1.1 200 OK\r\nX-Long: 0123456789012345678901234567890123456789",
+        ] {
+            let e = read_message_max(&mut BufReader::new(raw), true, false, 50).unwrap_err();
+            assert!(e.to_string().contains("larger than"), "{e}");
+        }
+        let ok = b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nhi";
+        assert!(read_message_max(&mut BufReader::new(&ok[..]), true, false, ok.len()).is_ok());
         assert_eq!(
             header("GET / HTTP/1.1\r\nHost: a.b\r\n\r\n", "host").as_deref(),
             Some("a.b")

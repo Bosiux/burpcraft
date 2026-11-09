@@ -76,6 +76,7 @@ cargo run --release                     # starts the app; the proxy listens on 1
 BURPCRAFT_PROXY=8090 cargo run --release   # another proxy port
 cargo run --release -- my.burpcraft     # open or create a project file (autosaved every 30 s)
 BURPCRAFT_API=1337 cargo run --release  # also start the REST API on 127.0.0.1:1337
+BURPCRAFT_MAX_MESSAGE_MB=1024 cargo run --release  # largest HTTP message held in memory (default 256)
 ```
 
 Point your browser at `127.0.0.1:8080` (or your `BURPCRAFT_PROXY` port) and trust `~/.burpcraft/ca.pem`, or use **Proxy → Intercept → Open browser**.

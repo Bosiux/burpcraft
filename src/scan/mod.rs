@@ -262,6 +262,7 @@ mod tests {
         assert_eq!(
             names,
             [
+                (Kind::Path, "a", "a"),
                 (Kind::Query, "x", "1"),
                 (Kind::Query, "y", "two"),
                 (Kind::Cookie, "s", "abc"),
@@ -271,9 +272,9 @@ mod tests {
                 (Kind::Body, "p", "b")
             ]
         );
-        let r = inject(req, &ps[1], "a b'&");
+        let r = inject(req, &ps[2], "a b'&");
         assert!(r.starts_with("POST /a?x=1&y=a%20b'%26 HTTP/1.1"));
-        let r = inject(req, &ps[5], "<x>");
+        let r = inject(req, &ps[6], "<x>");
         assert!(r.ends_with("\r\n\r\nu=%3Cx%3E&p=b") && r.contains("Content-Length: 13"));
         let json = "POST / HTTP/1.1\r\nContent-Type: application/json\r\n\r\n{\"name\":\"bob\",\"age\":30}";
         let jp = points(json);
@@ -284,7 +285,10 @@ mod tests {
         assert!(inject(json, &jp[0], "a\"b").contains("{\"name\":\"a\\\"b\",\"age\":30}"));
         assert!(inject(json, &jp[1], "1'").contains("\"age\":\"1'\""));
         let xml = "POST /x HTTP/1.1\r\nContent-Type: application/xml\r\nContent-Length: 42\r\n\r\n<?xml version=\"1.0\"?><data><n>bob</n></data>";
-        let xp = points(xml);
+        let xp: Vec<Point> = points(xml)
+            .into_iter()
+            .filter(|p| p.kind == Kind::Xml)
+            .collect();
         assert_eq!(
             xp.iter()
                 .map(|p| (p.kind, &xml[p.start..p.end]))
@@ -302,7 +306,10 @@ mod tests {
     #[test]
     fn xxe_probe_substitutes_entity() {
         let xml = "POST /x HTTP/1.1\r\nContent-Type: application/xml\r\nContent-Length: 42\r\n\r\n<?xml version=\"1.0\"?><data><n>bob</n></data>";
-        let p = &points(xml)[0];
+        let p = &points(xml)
+            .into_iter()
+            .find(|p| p.kind == Kind::Xml)
+            .unwrap();
         let r = xxe_inject(xml, p, "file:///etc/passwd");
         let body = r.split_once("\r\n\r\n").unwrap().1;
         assert_eq!(
@@ -625,13 +632,17 @@ mod tests {
                 "missing {n} on {p}; found {found:?}"
             );
         }
-        // negative controls: escaped reflection and the login form are clean
+        // negative controls: escaped reflection and the login form have no active finding
+        // (passive header findings from the scanner's own traffic are expected there)
+        let active: Vec<&str> = expect.iter().map(|(_, n)| *n).collect();
         assert!(
-            !found
-                .iter()
-                .any(|(p, n)| (p == "/safe" || p == "/login") && *n != "Echoed marker"),
+            !found.iter().any(|(p, n)| (p == "/safe" || p == "/login")
+                && *n != "Echoed marker"
+                && active.contains(n)),
             "false positive: {found:?}"
         );
+        // scanner traffic is passively scanned too
+        assert!(found.contains(&("/search".into(), "No Content-Security-Policy")));
         // crawler stayed on the origin and skipped static files
         assert!(
             s.history
