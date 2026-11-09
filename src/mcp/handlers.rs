@@ -7,6 +7,7 @@ use std::time::Instant;
 
 use crate::automation::openapi::{self, J};
 use crate::proxy::{self, Entry, Rule};
+use crate::tools::target::url_in_scope;
 use crate::{http::codec, http::net, scan, security::collab};
 
 use super::Ctx;
@@ -454,8 +455,8 @@ fn rest_get(path: &str, ctx: &Ctx) -> Result<J, String> {
 }
 
 /// Starts a scan from JSON arguments; shared by MCP `scan_start` and REST `POST /v0.1/scan`.
-/// A Burp-style `scope` object ({"include":[{"rule":prefix}],"exclude":[...]}) replaces the
-/// Target scope for this scan only.
+/// A Burp-style `scope` object ({"include":[{"rule":prefix}],"exclude":[...]}) narrows the
+/// Target scope for this scan only; it never widens it.
 pub(crate) fn start_scan(
     a: &J,
     tasks: &crate::automation::rest::Tasks,
@@ -505,8 +506,10 @@ pub(crate) fn start_scan(
     if let Some(d) = num_arg(a, "delay_ms") {
         cfg.delay_ms = d.clamp(0, 60_000) as u64;
     }
+    // a per-scan scope can only narrow the Target scope: its include rules must already be in
+    // scope, Target excludes still apply, and with no include rule the Target ones are kept
     let scope = match a.get("scope") {
-        Some(sc) => {
+        Some(sc @ J::Obj(_)) => {
             let rules = |k: &str, include: bool| -> Vec<(bool, bool, String)> {
                 match sc.get(k) {
                     Some(J::Arr(v)) => v
@@ -517,10 +520,19 @@ pub(crate) fn start_scan(
                     _ => vec![],
                 }
             };
+            let outer = scope.lock().unwrap().clone();
             let mut r = rules("include", true);
+            if let Some((_, _, p)) = r.iter().find(|(_, _, p)| !url_in_scope(&outer, p, true)) {
+                return Err(format!("scope rule {p} is outside the Target scope"));
+            }
+            if r.is_empty() {
+                r.extend(outer.iter().filter(|(on, inc, _)| *on && *inc).cloned());
+            }
+            r.extend(outer.iter().filter(|(on, inc, _)| *on && !*inc).cloned());
             r.extend(rules("exclude", false));
             std::sync::Arc::new(std::sync::Mutex::new(r))
         }
+        Some(_) => return Err("`scope` must be an object".into()),
         None => scope.clone(),
     };
     if let Some(u) = scan::out_of_scope(&scope, &urls, &extra) {

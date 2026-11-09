@@ -301,8 +301,24 @@ mod tests {
         );
         assert_eq!(st, "400 Bad Request");
         assert!(body.contains("outside the scan scope"), "{body}");
-        // MCP parity: a raw request + target, a per-scan Burp-style scope, threads/delay
+        // a per-scan scope cannot widen the Target scope, and must be an object
         let req = |b: &str| route("POST", "/v0.1/scan", b, "", &tasks, &state, &scope);
+        let (st, _, body) = req(
+            r#"{"urls": ["http://127.0.0.1:9/"], "scope": {"include": [{"rule": "http://127.0.0.1:9/"}]}}"#,
+        );
+        assert!(
+            st == "400 Bad Request" && body.contains("outside the Target scope"),
+            "{body}"
+        );
+        assert_eq!(
+            req(r#"{"urls": ["http://in.test/"], "scope": "x"}"#).0,
+            "400 Bad Request"
+        );
+        scope
+            .lock()
+            .unwrap()
+            .push((true, true, "http://127.0.0.1:9/".into()));
+        // MCP parity: a raw request + target, a per-scan Burp-style scope, threads/delay
         let ok = r#"{"request": "GET /?q=1 HTTP/1.1\nHost: x\n\n", "target": "http://127.0.0.1:9", "threads": 2, "delay_ms": 1, "scope": {"include": [{"rule": "http://127.0.0.1:9/"}]}}"#;
         assert_eq!(req(ok).0, "201 Created");
         let (st, _, body) = req(
