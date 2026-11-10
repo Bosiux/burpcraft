@@ -1000,7 +1000,39 @@ fn app_icon() -> egui::IconData {
     }
 }
 
+/// Keeps the default panic output and also appends it, with a backtrace, to `~/.burpcraft/crash.log`:
+/// a panic in a connection or scan thread is otherwise invisible in a GUI app.
+fn install_crash_log() {
+    let default = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        default(info);
+        let thread = std::thread::current();
+        let report = format!(
+            "{} thread '{}' v{}: {info}\n{}\n",
+            chrono::Local::now().to_rfc3339(),
+            thread.name().unwrap_or("<unnamed>"),
+            env!("CARGO_PKG_VERSION"),
+            std::backtrace::Backtrace::force_capture()
+        );
+        let _ = append_crash(&net::data_dir().join("crash.log"), &report);
+    }));
+}
+
+/// Owner-only (backtraces can carry request data), rotated to `crash.log.1` past 1 MiB.
+fn append_crash(path: &std::path::Path, report: &str) -> std::io::Result<()> {
+    use std::io::Write;
+    if std::fs::metadata(path).is_ok_and(|m| m.len() > 1 << 20) {
+        std::fs::rename(path, path.with_extension("log.1"))?;
+    }
+    let mut o = std::fs::OpenOptions::new();
+    o.create(true).append(true);
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::mode(&mut o, 0o600);
+    o.open(path)?.write_all(report.as_bytes())
+}
+
 fn main() -> eframe::Result {
+    install_crash_log();
     let opts = eframe::NativeOptions {
         renderer: eframe::Renderer::Wgpu,
         viewport: egui::ViewportBuilder::default()
@@ -1014,6 +1046,25 @@ fn main() -> eframe::Result {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn crash_log_appends_and_rotates() {
+        let dir = std::env::temp_dir().join(format!("burpcraft-crash-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let log = dir.join("crash.log");
+        super::append_crash(&log, "one\n").unwrap();
+        super::append_crash(&log, "two\n").unwrap();
+        assert_eq!(std::fs::read_to_string(&log).unwrap(), "one\ntwo\n");
+        std::fs::write(&log, vec![b'x'; (1 << 20) + 1]).unwrap();
+        super::append_crash(&log, "three\n").unwrap();
+        assert_eq!(std::fs::read_to_string(&log).unwrap(), "three\n");
+        assert_eq!(
+            std::fs::metadata(dir.join("crash.log.1")).unwrap().len(),
+            (1 << 20) + 1
+        );
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
     #[test]
     fn schedule_times() {
         assert!(super::next_time("").is_none() && super::next_time("25:00").is_none());

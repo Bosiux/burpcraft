@@ -138,6 +138,9 @@ cargo test --workspace     # unit and local end-to-end tests (vulnerable test ap
 python3 e2e.py             # proxy end-to-end checks against local HTTP and WebSocket servers
 ```
 
+Panics (also in background proxy and scan threads) are appended with a backtrace to `~/.burpcraft/crash.log`;
+attach it to bug reports after removing anything sensitive.
+
 See [ROADMAP.md](ROADMAP.md) for what is done and what is not covered yet, [CONTRIBUTING.md](CONTRIBUTING.md) to
 send a change and [SECURITY.md](SECURITY.md) to report a vulnerability.
 
