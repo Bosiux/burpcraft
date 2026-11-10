@@ -145,7 +145,7 @@ impl Tab {
             ui.label("Server:");
             ui.add(
                 egui::TextEdit::singleline(&mut self.store_server)
-                    .hint_text("host:port")
+                    .hint_text("host:port or https://host")
                     .desired_width(220.0),
             );
             if ui.button("Refresh").clicked() {

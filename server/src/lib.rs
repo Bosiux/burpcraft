@@ -30,7 +30,7 @@ pub struct Config {
     pub smtp_port: Option<u16>,
     /// Required on poll requests when non-empty.
     pub secret: String,
-    /// BApp Store directory: `catalog.tsv` (name, version, description, file per line) plus the files.
+    /// BApp Store directory: `catalog.tsv` (name, version, description, file, sha256 per line) plus the files.
     pub bapps: Option<std::path::PathBuf>,
 }
 

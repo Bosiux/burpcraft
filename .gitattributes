@@ -1,0 +1,2 @@
+# BApp files are hashed in catalog.tsv: never rewrite their line endings
+server/bapps/* -text
