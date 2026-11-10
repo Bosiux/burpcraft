@@ -153,7 +153,9 @@ Once a day at startup the app asks the GitHub Releases API whether a newer versi
 never downloads or installs anything and sends nothing beyond that request. Beta builds also see betas. Turn it off in
 *Settings → User interface → Updates*, or set `BURPCRAFT_NO_UPDATE_CHECK=1`.
 
-- **Stable**: bump `version` in `Cargo.toml`, merge to `main`, then `git tag vX.Y.Z && git push origin vX.Y.Z`.
+- **Stable**: bump `version` in `Cargo.toml`, run `BURPCRAFT_WRITE_FIXTURE=1 cargo test fixtures` and commit the new
+  `tests/fixtures/project-X.Y.Z.burpcraft` (older versions' files must keep opening), merge to `main`, then
+  `git tag vX.Y.Z && git push origin vX.Y.Z`.
 - **Beta**: *Actions → Release → Run workflow* on any branch publishes `vX.Y.Z-beta.N` as a pre-release (never `latest`).
 
 ## License
