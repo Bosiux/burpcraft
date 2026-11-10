@@ -103,7 +103,7 @@ pub fn html_decode(s: &str) -> String {
     while let Some(i) = rest.find('&') {
         out.push_str(&rest[..i]);
         rest = &rest[i..];
-        let Some(end) = rest[..rest.len().min(12)].find(';') else {
+        let Some(end) = rest[..rest.floor_char_boundary(12)].find(';') else {
             out.push('&');
             rest = &rest[1..];
             continue;
@@ -143,14 +143,16 @@ pub fn hex_encode(data: &[u8]) -> String {
 }
 
 pub fn hex_decode(s: &str) -> Option<Vec<u8>> {
-    let s: String = s.chars().filter(|c| !c.is_whitespace()).collect();
-    if !s.len().is_multiple_of(2) {
+    // by char, not byte offset: non-ASCII input is invalid hex, not a slicing panic
+    let d: Vec<u32> = s
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .map(|c| c.to_digit(16))
+        .collect::<Option<_>>()?;
+    if !d.len().is_multiple_of(2) {
         return None;
     }
-    (0..s.len())
-        .step_by(2)
-        .map(|i| u8::from_str_radix(&s[i..i + 2], 16).ok())
-        .collect()
+    Some(d.chunks(2).map(|p| (p[0] * 16 + p[1]) as u8).collect())
 }
 
 pub fn octal_encode(data: &[u8]) -> String {
