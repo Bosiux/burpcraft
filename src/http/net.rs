@@ -2,7 +2,7 @@
 use std::collections::HashMap;
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::net::TcpStream;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
@@ -346,19 +346,26 @@ fn ca_params() -> rcgen::CertificateParams {
 impl Ca {
     /// Loads the CA from `~/.burpcraft`, creating it on first run so users install it once.
     pub fn load_or_create() -> Result<Ca, Box<dyn std::error::Error>> {
-        let dir = data_dir();
-        std::fs::create_dir_all(&dir)?;
+        Self::load_or_create_in(&data_dir())
+    }
+
+    fn load_or_create_in(dir: &Path) -> Result<Ca, Box<dyn std::error::Error>> {
+        std::fs::create_dir_all(dir)?;
+        // the browser trusts this key for every site: only the owner may read it (and the captured traffic)
+        restrict(dir, 0o700)?;
         let (kp, cp) = (dir.join("ca.key"), dir.join("ca.pem"));
         let (key, cert_pem) = match (std::fs::read_to_string(&kp), std::fs::read_to_string(&cp)) {
             (Ok(k), Ok(c)) => (rcgen::KeyPair::from_pem(&k)?, c),
             _ => {
                 let key = rcgen::KeyPair::generate()?;
                 let pem = ca_params().self_signed(&key)?.pem();
-                std::fs::write(&kp, key.serialize_pem())?;
+                write_private(&kp, key.serialize_pem().as_bytes())?;
                 std::fs::write(&cp, &pem)?;
                 (key, pem)
             }
         };
+        // keys written before this check was added were world-readable
+        restrict(&kp, 0o600)?;
         let der = pem_to_der(&cert_pem).ok_or("bad CA pem")?;
         Ok(Ca {
             issuer: rcgen::Issuer::new(ca_params(), key),
@@ -396,6 +403,26 @@ impl Ca {
     }
 }
 
+/// Creates (or truncates) `path` readable by the owner only, with no window where it is world-readable.
+fn write_private(path: &Path, data: &[u8]) -> io::Result<()> {
+    let mut o = std::fs::OpenOptions::new();
+    o.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::mode(&mut o, 0o600);
+    o.open(path)?.write_all(data)
+}
+
+// ponytail: no-op on Windows, where ~/.burpcraft inherits the user-only ACL of the profile folder
+fn restrict(path: &Path, mode: u32) -> io::Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode))?;
+    }
+    let _ = (path, mode);
+    Ok(())
+}
+
 pub fn pem_to_der(pem: &str) -> Option<Vec<u8>> {
     let b64: String = pem.lines().filter(|l| !l.starts_with("-----")).collect();
     crate::http::codec::base64_decode(&b64)
@@ -404,6 +431,27 @@ pub fn pem_to_der(pem: &str) -> Option<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn ca_key_is_owner_only() {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = |p: &Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
+        let dir = std::env::temp_dir().join(format!("burpcraft-ca-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let key = dir.join("ca.key");
+
+        let first = Ca::load_or_create_in(&dir).unwrap();
+        assert_eq!((mode(&dir), mode(&key)), (0o700, 0o600));
+
+        // an install from before the fix: world-readable key and folder get tightened, same CA kept
+        std::fs::set_permissions(&key, std::fs::Permissions::from_mode(0o644)).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let again = Ca::load_or_create_in(&dir).unwrap();
+        assert_eq!((mode(&dir), mode(&key)), (0o700, 0o600));
+        assert_eq!(first.cert_pem, again.cert_pem);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 
     #[test]
     fn send_to_local_server() {
