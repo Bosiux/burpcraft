@@ -5,7 +5,7 @@ use eframe::egui::{Color32, FontFamily, FontId, Stroke, TextFormat};
 use scraper::node::Node;
 
 mod chromium;
-mod css;
+pub(crate) mod css;
 mod native;
 
 pub use chromium::{

@@ -2,6 +2,8 @@
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 mod automation;
 mod ext;
+#[cfg(test)]
+mod fuzz;
 mod http;
 mod intruder;
 mod mcp;

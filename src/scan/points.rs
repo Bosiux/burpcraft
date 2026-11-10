@@ -145,7 +145,9 @@ pub fn points(req: &str) -> Vec<Point> {
                     .and_then(|n| n.split('"').next())
             {
                 let vstart = part + h + 4;
-                let vend = next.saturating_sub(2).max(vstart); // CRLF before the delimiter
+                // the CRLF before the delimiter, only when it is there (a malformed body may lack it)
+                let vend = next - if body[..next].ends_with("\r\n") { 2 } else { 0 };
+                let vend = vend.max(vstart);
                 out.push(Point {
                     kind: Kind::Multipart,
                     name: name.to_string(),

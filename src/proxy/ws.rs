@@ -40,16 +40,17 @@ pub fn ws_frames(buf: &mut Vec<u8>) -> Vec<(u8, Vec<u8>)> {
         } else {
             None
         };
-        if buf.len() < i + len {
+        // the 64-bit length is the peer's: i + len must not wrap past the bounds check
+        let Some(end) = i.checked_add(len).filter(|&e| e <= buf.len()) else {
             break;
-        }
-        let mut data = buf[i..i + len].to_vec();
+        };
+        let mut data = buf[i..end].to_vec();
         if let Some(k) = key {
             data.iter_mut()
                 .enumerate()
                 .for_each(|(j, b)| *b ^= k[j % 4]);
         }
-        buf.drain(..i + len);
+        buf.drain(..end);
         out.push((op, data));
     }
     out

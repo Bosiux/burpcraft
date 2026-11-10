@@ -89,18 +89,19 @@ pub fn images() -> &'static Mutex<std::collections::HashMap<String, Vec<u8>>> {
 pub fn dechunk(b: &[u8]) -> Vec<u8> {
     let mut out = Vec::new();
     let mut i = 0;
-    while let Some(nl) = find(&b[i..], b"\r\n") {
+    // sizes come from the peer: a huge or truncated chunk ends the body instead of overflowing
+    while let Some(nl) = b.get(i..).and_then(|r| find(r, b"\r\n")) {
         let line = String::from_utf8_lossy(&b[i..i + nl]).into_owned();
         let Ok(size) = usize::from_str_radix(line.split(';').next().unwrap_or("").trim(), 16)
         else {
             break;
         };
         i += nl + 2;
-        if size == 0 || i + size > b.len() {
+        let Some(end) = i.checked_add(size).filter(|&e| size > 0 && e <= b.len()) else {
             break;
-        }
-        out.extend_from_slice(&b[i..i + size]);
-        i += size + 2;
+        };
+        out.extend_from_slice(&b[i..end]);
+        i = end + 2;
     }
     out
 }
