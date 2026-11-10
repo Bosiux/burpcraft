@@ -193,12 +193,19 @@ fn handle(mut c: TcpStream, key: &str, tasks: &Tasks, state: &State, scope: &Sco
     let Ok(rc) = c.try_clone() else { return };
     let mut r = BufReader::new(rc);
     let (mut first, mut line, mut len) = (String::new(), String::new(), 0usize);
+    let (mut host, mut origin) = (String::new(), String::new());
     if r.read_line(&mut first).is_err() {
         return;
     }
     while r.read_line(&mut line).is_ok_and(|n| n > 2) {
-        if let Some(v) = line.to_ascii_lowercase().strip_prefix("content-length:") {
-            len = v.trim().parse().unwrap_or(0);
+        if let Some((k, v)) = line.split_once(':') {
+            let v = v.trim().to_string();
+            match k.trim().to_ascii_lowercase().as_str() {
+                "content-length" => len = v.parse().unwrap_or(0),
+                "host" => host = v,
+                "origin" => origin = v,
+                _ => {}
+            }
         }
         line.clear();
     }
@@ -206,15 +213,20 @@ fn handle(mut c: TcpStream, key: &str, tasks: &Tasks, state: &State, scope: &Sco
     let _ = r.read_exact(&mut body);
     let mut parts = first.split_whitespace();
     let (method, path) = (parts.next().unwrap_or(""), parts.next().unwrap_or("/"));
-    let (status, extra, body) = route(
-        method,
-        path,
-        &String::from_utf8_lossy(&body),
-        key,
-        tasks,
-        state,
-        scope,
-    );
+    // a web page on another site must not start scans or read issues (DNS rebinding / CSRF)
+    let (status, extra, body) = if !crate::automation::is_local(&host, &origin) {
+        ("403 Forbidden", String::new(), String::new())
+    } else {
+        route(
+            method,
+            path,
+            &String::from_utf8_lossy(&body),
+            key,
+            tasks,
+            state,
+            scope,
+        )
+    };
     let _ = write!(
         c,
         "HTTP/1.1 {status}\r\nContent-Type: application/json\r\n{extra}Content-Length: {}\r\nConnection: close\r\n\r\n{body}",
@@ -334,5 +346,35 @@ mod tests {
             st == "400 Bad Request" && body.contains("bad logged_out regex"),
             "{body}"
         );
+    }
+
+    #[test]
+    fn web_pages_cannot_drive_it() {
+        let port = start(
+            0,
+            String::new(),
+            Default::default(),
+            crate::proxy::Shared::new(),
+            Scope::default(),
+        )
+        .unwrap();
+        let status = |host: &str, origin: &str| {
+            let mut c = TcpStream::connect(("127.0.0.1", port)).unwrap();
+            // a "simple" cross-site POST: text/plain needs no CORS preflight
+            let body = r#"{"urls": ["http://127.0.0.1:9/"]}"#;
+            write!(
+                c,
+                "POST /v0.1/scan HTTP/1.1\r\nHost: {host}\r\n{origin}Content-Type: text/plain\r\nContent-Length: {}\r\n\r\n{body}",
+                body.len()
+            )
+            .unwrap();
+            let mut first = String::new();
+            BufReader::new(c).read_line(&mut first).unwrap();
+            first
+        };
+        let local = format!("127.0.0.1:{port}");
+        assert!(status(&local, "Origin: https://evil.test\r\n").contains("403"));
+        assert!(status("evil.test", "").contains("403"));
+        assert!(!status(&local, "").contains("403"));
     }
 }

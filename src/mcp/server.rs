@@ -28,8 +28,13 @@ fn serve(c: TcpStream, key: &str, ctx: &Ctx) {
         if r.read_line(&mut first).unwrap_or(0) == 0 {
             return;
         }
-        let (mut len, mut auth, mut origin, mut line) =
-            (0usize, String::new(), String::new(), String::new());
+        let (mut len, mut auth, mut origin, mut host, mut line) = (
+            0usize,
+            String::new(),
+            String::new(),
+            String::new(),
+            String::new(),
+        );
         while r.read_line(&mut line).is_ok_and(|n| n > 2) {
             if let Some((k, v)) = line.split_once(':') {
                 let v = v.trim().to_string();
@@ -37,6 +42,7 @@ fn serve(c: TcpStream, key: &str, ctx: &Ctx) {
                     "content-length" => len = v.parse().unwrap_or(0),
                     "authorization" => auth = v,
                     "origin" => origin = v,
+                    "host" => host = v,
                     _ => {}
                 }
             }
@@ -52,15 +58,7 @@ fn serve(c: TcpStream, key: &str, ctx: &Ctx) {
         let mut parts = first.split_whitespace();
         let (method, path) = (parts.next().unwrap_or(""), parts.next().unwrap_or(""));
         // browsers on other sites must not drive the proxy (DNS rebinding / CSRF)
-        let local = origin.is_empty()
-            || [
-                "http://127.0.0.1",
-                "http://localhost",
-                "https://127.0.0.1",
-                "https://localhost",
-            ]
-            .iter()
-            .any(|o| origin == *o || origin.starts_with(&format!("{o}:")));
+        let local = crate::automation::is_local(&host, &origin);
         let (status, out) = if !key.is_empty() && auth != format!("Bearer {key}") {
             ("401 Unauthorized", String::new())
         } else if !local {
