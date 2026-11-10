@@ -88,9 +88,11 @@ jobs:
           xvfb-run -a target/debug/burpcraft > "$RUNNER_TEMP/app.log" 2>&1 &
           for i in $(seq 1 100); do nc -z 127.0.0.1 8080 && break; sleep 0.3; done
           python3 e2e.py
-          kill %1 || true
+          pkill -f target/debug/burpcraft || true
+      # own ports, so a leftover app from the step above can never answer in its place
       - name: Scanner / REST / MCP e2e (e2e_scan.py)
         run: xvfb-run -a python3 e2e_scan.py --launch target/debug/burpcraft
+        env: { E2E_PROXY: "18080", E2E_API: "11337", E2E_MCP: "11338" }
       - if: failure()
         run: cat "$RUNNER_TEMP/app.log" || true
 
