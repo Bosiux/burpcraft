@@ -91,6 +91,14 @@ cargo run -p burpcraft-server -- --domain oast.example.com --public-ip 203.0.113
 
 Then set the server in the **Collaborator** tab (or click **Start built-in server**).
 
+Or with Docker (server only; unprivileged ports inside the container, mapped to the real ones):
+
+```sh
+docker build -t burpcraft-server .
+docker run -p 53:5353/udp -p 80:8080 -p 25:2525 -v "$PWD/server/bapps:/bapps:ro" burpcraft-server \
+  --domain oast.example.com --public-ip 203.0.113.7 --dns 5353 --http 8080 --smtp 2525 --secret s3cret --bapps /bapps
+```
+
 `--bapps DIR` serves `DIR/catalog.tsv`, one BApp per line: name, version, description, file and the file's
 SHA-256 (`shasum -a 256 <file>`), tab-separated. BurpCraft refuses entries without a hash and files that do not
 match it. Behind a TLS reverse proxy, enter the store as `https://host` in **Extensions → BApp Store** so the
