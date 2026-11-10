@@ -3,6 +3,7 @@ name = "burpcraft-server"
 version = "0.0.1"
 edition = "2024"
 license = "MIT"
+publish = false
 description = "Self-hosted BurpCraft Collaborator server: DNS, HTTP and SMTP interaction capture with a polling API"
 
 [dependencies]
