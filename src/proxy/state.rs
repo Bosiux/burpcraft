@@ -115,10 +115,14 @@ impl Shared {
             highlight: None,
             tool,
         };
-        // ponytail: passive checks run under the state lock; move them out if tool traffic gets heavy
-        let mut found = crate::security::scanner::passive(&e);
-        found.extend(crate::security::bcheck::passive(&e));
-        self.add_issues(found, Some(&e));
+        // audit payloads make every request a new URL: passive findings there are the crawled
+        // page's again, once per payload (the crawler's own fetches are still scanned)
+        if tool != "Scanner" {
+            // ponytail: passive checks run under the state lock; move them out if tool traffic gets heavy
+            let mut found = crate::security::scanner::passive(&e);
+            found.extend(crate::security::bcheck::passive(&e));
+            self.add_issues(found, Some(&e));
+        }
         self.logger.push(e);
         self.repaint();
     }

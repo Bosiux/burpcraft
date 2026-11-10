@@ -119,7 +119,7 @@ pub(crate) fn crawl(c: &Ctx, start: &str, status: &Mutex<String>) -> Vec<String>
         }
         *status.lock().unwrap() = format!("Crawling: {} pages, {path}", seen.len());
         let req = get_request(&c.target, &path);
-        let Some((resp, _)) = c.send(&req) else {
+        let Some((resp, _)) = c.send_as("Crawler", &req) else {
             continue;
         };
         {
