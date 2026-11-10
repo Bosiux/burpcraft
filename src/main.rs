@@ -1037,6 +1037,11 @@ fn append_crash(path: &std::path::Path, report: &str) -> std::io::Result<()> {
 
 fn main() -> eframe::Result {
     install_crash_log();
+    // `burpcraft scan ...` runs headless (CI) and never opens a window
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.first().is_some_and(|a| a == "scan") {
+        std::process::exit(automation::cli::scan(&args[1..]));
+    }
     let opts = eframe::NativeOptions {
         renderer: eframe::Renderer::Wgpu,
         viewport: egui::ViewportBuilder::default()
