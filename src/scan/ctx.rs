@@ -131,7 +131,7 @@ impl Ctx {
         let login = crate::tools::fix_content_length(
             &self.cfg.login.replace("\r\n", "\n").replace('\n', "\r\n"),
         );
-        if let Some((resp, _)) = self.send_once(&login) {
+        if let Some((resp, _)) = self.send_once("Scanner", &login) {
             let set: Vec<String> = String::from_utf8_lossy(proxy::head(&resp))
                 .lines()
                 .filter_map(|l| {
@@ -159,8 +159,14 @@ impl Ctx {
     /// Like `send_once`, but when a login is configured and the response says the session
     /// expired, logs in again (once for all threads) and retries the request.
     pub(crate) fn send(&self, req: &str) -> Option<(Vec<u8>, Duration)> {
+        self.send_as("Scanner", req)
+    }
+
+    /// `send` with the tool name the exchange is logged under: "Crawler" responses are passively
+    /// scanned, "Scanner" (audit payload) responses are not, as each payload is a new URL.
+    pub(crate) fn send_as(&self, tool: &'static str, req: &str) -> Option<(Vec<u8>, Duration)> {
         let sent_with = self.cookies.lock().unwrap().clone();
-        let r = self.send_once(req)?;
+        let r = self.send_once(tool, req)?;
         if self.cfg.login.trim().is_empty() || !self.is_logged_out(&r.0) {
             return Some(r);
         }
@@ -179,7 +185,7 @@ impl Ctx {
                 );
             }
         }
-        let retry = self.send_once(req);
+        let retry = self.send_once(tool, req);
         if retry.as_ref().is_some_and(|(b, _)| !self.is_logged_out(b)) {
             // a real expiry: the budget only counts re-logins that did not help
             *self.relogins.lock().unwrap() = 0;
@@ -188,7 +194,7 @@ impl Ctx {
     }
 
     /// Adds auth headers/cookies, sends, logs; None when stopped, out of scope or on a network error.
-    pub(crate) fn send_once(&self, req: &str) -> Option<(Vec<u8>, Duration)> {
+    pub(crate) fn send_once(&self, tool: &'static str, req: &str) -> Option<(Vec<u8>, Duration)> {
         if self.stop.load(Ordering::SeqCst) {
             return None;
         }
@@ -227,7 +233,7 @@ impl Ctx {
         let took = t0.elapsed();
         self.requests.fetch_add(1, Ordering::SeqCst);
         self.state.lock().unwrap().log_tool(
-            "Scanner",
+            tool,
             &self.target.host,
             self.target.port,
             self.target.tls,
