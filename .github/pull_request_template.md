@@ -17,7 +17,7 @@
 <!-- "This change was generated with AI assistance." or "No AI assistance." -->
 
 ## Checklist
-- [ ] CI green (fmt, clippy, tests, audit)
+- [ ] CI green (fmt, clippy, tests, cargo-deny)
 - [ ] Tests added or updated
 - [ ] README / ROADMAP updated if behaviour changed
 - [ ] No secrets, debug leftovers or unexplained dependencies
