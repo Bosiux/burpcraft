@@ -149,9 +149,7 @@ never downloads or installs anything and sends nothing beyond that request. Beta
 
 ## License
 
-Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or [MIT license](LICENSE-MIT), at your option.
-Unless you explicitly state otherwise, any contribution you submit for inclusion in BurpCraft is dual licensed as
-above, without any additional terms or conditions.
+[MIT](LICENSE).
 
 ---
 

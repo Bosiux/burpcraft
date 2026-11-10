@@ -97,14 +97,14 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           mkdir -p "dist/$PKG"
-          cp target/${{ matrix.target }}/release/{burpcraft,burpcraft-server} README.md LICENSE-MIT LICENSE-APACHE "dist/$PKG/"
+          cp target/${{ matrix.target }}/release/{burpcraft,burpcraft-server} README.md LICENSE "dist/$PKG/"
           tar -C dist -czf "dist/$PKG.tar.gz" "$PKG"
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
         run: |
           mkdir -p "dist/$PKG"
-          cp target/${{ matrix.target }}/release/{burpcraft,burpcraft-server}.exe README.md LICENSE-MIT LICENSE-APACHE "dist/$PKG/"
+          cp target/${{ matrix.target }}/release/{burpcraft,burpcraft-server}.exe README.md LICENSE "dist/$PKG/"
           cd dist && 7z a -tzip "$PKG.zip" "$PKG"
 
       - name: Package (macOS)
@@ -136,7 +136,7 @@ jobs:
           EOF
           # ponytail: ad-hoc signature only; Developer ID signing + notarization need an Apple account secret
           codesign --force --deep --sign - "$app"
-          cp README.md LICENSE-MIT LICENSE-APACHE "dist/$PKG/"
+          cp README.md LICENSE "dist/$PKG/"
           ln -s /Applications "dist/$PKG/Applications"
           hdiutil create -volname "BurpCraft $VERSION" -srcfolder "dist/$PKG" -ov -format UDZO "dist/$PKG.dmg"
 
