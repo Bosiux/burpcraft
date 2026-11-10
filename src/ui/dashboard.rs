@@ -394,7 +394,7 @@ impl App {
                 let busy = matches!(ai::answers().lock().unwrap().get(&i.id), Some(None));
                 if ui
                     .add_enabled(!busy, egui::Button::new("Explain with Claude"))
-                    .on_hover_text(format!("Sends this issue and its request/response to the Anthropic API ({})", ai::MODEL))
+                    .on_hover_text(format!("Sends this issue and its request/response to the Anthropic API ({}); Authorization, Cookie and token headers are redacted, bodies are sent as captured", ai::MODEL))
                     .clicked()
                 {
                     ai::explain(i.clone(), ev_req, ev_resp, ui.ctx().clone());

@@ -28,8 +28,57 @@ pub fn answers() -> &'static Mutex<HashMap<usize, Option<Result<String, String>>
     A.get_or_init(Default::default)
 }
 
+const REDACTED: &str = "[redacted by BurpCraft]";
+
+/// Credentials never leave the machine: header values that carry them are replaced, keeping what
+/// explains a finding (auth scheme, cookie names and attributes). The body is sent as captured.
+fn redact(t: &str) -> String {
+    let mut out = String::with_capacity(t.len());
+    let mut in_head = true;
+    for line in t.split_inclusive('\n') {
+        let bare = line.trim_end_matches(['\r', '\n']);
+        in_head &= !bare.is_empty();
+        let Some((name, value)) = bare.split_once(':').filter(|_| in_head) else {
+            out.push_str(line);
+            continue;
+        };
+        let n = name.trim().to_ascii_lowercase();
+        let v = value.trim();
+        let red = match n.as_str() {
+            "authorization" | "proxy-authorization" => match v.split_once(' ') {
+                Some((scheme, _)) => format!("{scheme} {REDACTED}"),
+                None => REDACTED.into(),
+            },
+            // name=value pairs; Set-Cookie keeps its attributes (Path, HttpOnly, ...) after the first ';'
+            "cookie" | "set-cookie" => v
+                .split(';')
+                .enumerate()
+                .map(|(i, p)| match p.split_once('=') {
+                    Some((k, _)) if n == "cookie" || i == 0 => format!("{k}={REDACTED}"),
+                    _ => p.to_string(),
+                })
+                .collect::<Vec<_>>()
+                .join(";"),
+            _ if [
+                "token", "api-key", "apikey", "secret", "session", "password",
+            ]
+            .iter()
+            .any(|k| n.contains(k)) =>
+            {
+                REDACTED.into()
+            }
+            _ => {
+                out.push_str(line);
+                continue;
+            }
+        };
+        out.push_str(&format!("{name}: {red}{}", &line[bare.len()..]));
+    }
+    out
+}
+
 fn evidence(label: &str, msg: &[u8]) -> String {
-    let t = crate::proxy::display(msg);
+    let t = redact(&crate::proxy::display(msg));
     if t.len() > MAX_EVIDENCE {
         format!(
             "{label} (first {MAX_EVIDENCE} of {} bytes; the rest was cut):\n{}",
@@ -228,6 +277,25 @@ mod tests {
         assert_eq!(
             parse_response(401, err).unwrap_err(),
             "Anthropic API error 401: authentication_error invalid x-api-key"
+        );
+    }
+
+    #[test]
+    fn credentials_are_redacted() {
+        let msg = "GET / HTTP/1.1\r\nHost: a.test\r\nAuthorization: Bearer eyJsecret\r\nCookie: sid=s3cr3t; theme=dark\r\nX-Api-Key: k3y\r\nX-CSRF-Token: t0k\r\n\r\nCookie: in-body-stays";
+        let r = redact(msg);
+        for leaked in ["eyJsecret", "s3cr3t", "dark", "k3y", "t0k"] {
+            assert!(!r.contains(leaked), "{leaked} leaked: {r}");
+        }
+        assert!(r.contains("Authorization: Bearer [redacted by BurpCraft]\r\n"));
+        assert!(
+            r.contains("Cookie: sid=[redacted by BurpCraft]; theme=[redacted by BurpCraft]\r\n")
+        );
+        assert!(r.contains("Host: a.test\r\n") && r.ends_with("\r\n\r\nCookie: in-body-stays"));
+        let resp = redact("HTTP/1.1 200 OK\nSet-Cookie: sid=abc; Path=/; HttpOnly\n\n");
+        assert!(
+            resp.contains("Set-Cookie: sid=[redacted by BurpCraft]; Path=/; HttpOnly\n"),
+            "{resp}"
         );
     }
 
