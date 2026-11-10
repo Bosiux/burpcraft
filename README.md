@@ -113,6 +113,20 @@ curl http://127.0.0.1:1337/v0.1/scan/1                                          
 
 `POST /v0.1/scan` takes the same fields as MCP `scan_start` (`request`/`target`, `openapi`, `headers`, `login`, `logged_out`, `threads`, `delay_ms`, `crawl`), plus Burp-style `scan_configurations` and a per-scan `scope` that narrows the Target scope (its include rules must lie inside it, Target excludes still apply): `{"include":[{"rule":"http://t/"}],"exclude":[{"rule":"http://t/logout"}]}`. Without one, the Target scope applies.
 
+## Headless scans (CI)
+
+`burpcraft scan` runs the scanner without a window, waits for it and writes reports; the exit status fails the build:
+
+```sh
+burpcraft scan https://staging.example.test/ --sarif burpcraft.sarif --fail-on medium
+burpcraft scan '{"urls": ["https://staging.example.test/api"], "openapi": "...", "headers": "Authorization: Bearer ..."}' --xml report.xml
+```
+
+Arguments are URLs or one JSON object with the REST/MCP scan fields (`urls`, `request`, `openapi`, `headers`, `login`,
+`logged_out`, `threads`, `delay_ms`, `scope`, `crawl`); `--thorough`, `--sarif`/`--xml`/`--html FILE`,
+`--fail-on high|medium|low|info|none` (default `high`). Exit status 0 = nothing at or above the threshold, 1 = issues
+found, 2 = usage or scan error. SARIF (2.1.0) uploads to GitHub code scanning (`github/codeql-action/upload-sarif`).
+
 ## MCP server (AI agents)
 
 Agents drive the running app over [MCP](https://modelcontextprotocol.io): read traffic, send and fuzz requests,

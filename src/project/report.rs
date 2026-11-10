@@ -133,6 +133,86 @@ pub fn xml(issues: &[Issue], history: &[Entry]) -> String {
     out + "</issues>\n"
 }
 
+/// SARIF 2.1.0 (GitHub code scanning, IDEs, CI dashboards): one rule per issue type, one result per
+/// issue, located at its URL. Severity maps High → error, Medium → warning, Low/Information → note.
+pub fn sarif(issues: &[Issue]) -> String {
+    use crate::automation::openapi::J;
+    let s = |v: &str| J::Str(v.into());
+    let obj = |v: Vec<(&str, J)>| J::Obj(v.into_iter().map(|(k, v)| (k.into(), v)).collect());
+    let issues = sorted(issues);
+    let mut rules: Vec<&str> = issues.iter().map(|i| i.name).collect();
+    rules.sort_unstable();
+    rules.dedup();
+    let rule = |name: &str| {
+        let i = issues.iter().find(|i| i.name == name).unwrap();
+        obj(vec![
+            ("id", s(name)),
+            ("shortDescription", obj(vec![("text", s(name))])),
+            ("fullDescription", obj(vec![("text", s(i.background))])),
+            ("help", obj(vec![("text", s(i.remediation))])),
+        ])
+    };
+    let result = |i: &&Issue| {
+        let level = match i.severity {
+            Severity::High => "error",
+            Severity::Medium => "warning",
+            _ => "note",
+        };
+        obj(vec![
+            ("ruleId", s(i.name)),
+            ("level", s(level)),
+            (
+                "message",
+                obj(vec![(
+                    "text",
+                    s(&format!(
+                        "{} ({} confidence): {}",
+                        i.name, i.confidence, i.detail
+                    )),
+                )]),
+            ),
+            (
+                "locations",
+                J::Arr(vec![obj(vec![(
+                    "physicalLocation",
+                    obj(vec![(
+                        "artifactLocation",
+                        obj(vec![("uri", s(&format!("{}{}", i.origin, i.path)))]),
+                    )]),
+                )])]),
+            ),
+            (
+                "properties",
+                obj(vec![
+                    ("severity", s(i.severity.label())),
+                    ("confidence", s(i.confidence)),
+                ]),
+            ),
+        ])
+    };
+    let driver = obj(vec![
+        ("name", s("BurpCraft")),
+        ("version", s(env!("CARGO_PKG_VERSION"))),
+        ("informationUri", s("https://github.com/Bosiux/burpcraft")),
+        ("rules", J::Arr(rules.iter().map(|r| rule(r)).collect())),
+    ]);
+    obj(vec![
+        (
+            "$schema",
+            s("https://json.schemastore.org/sarif-2.1.0.json"),
+        ),
+        ("version", s("2.1.0")),
+        (
+            "runs",
+            J::Arr(vec![obj(vec![
+                ("tool", obj(vec![("driver", driver)])),
+                ("results", J::Arr(issues.iter().map(result).collect())),
+            ])]),
+        ),
+    ])
+    .to_json()
+}
+
 /// Writes a report next to the projects (`~/.burpcraft/reports/`), returning its path.
 pub fn write(
     issues: &[Issue],
@@ -191,6 +271,35 @@ mod tests {
             highlight: None,
             tool: "Proxy",
         };
+        let sarif =
+            crate::automation::openapi::parse(&sarif(std::slice::from_ref(&issue))).unwrap();
+        let run = &sarif.get("runs").unwrap().items()[0];
+        let r = &run.get("results").unwrap().items()[0];
+        assert_eq!(sarif.get("version").and_then(|v| v.str()), Some("2.1.0"));
+        assert_eq!(r.get("level").and_then(|v| v.str()), Some("error"));
+        assert_eq!(
+            r.get("ruleId").and_then(|v| v.str()),
+            Some("Cross-site <scripting>")
+        );
+        let loc = r.get("locations").unwrap().items()[0]
+            .get("physicalLocation")
+            .unwrap();
+        assert_eq!(
+            loc.get("artifactLocation")
+                .unwrap()
+                .get("uri")
+                .and_then(|v| v.str()),
+            Some("https://a.test/q")
+        );
+        let rules = run
+            .get("tool")
+            .unwrap()
+            .get("driver")
+            .unwrap()
+            .get("rules")
+            .unwrap()
+            .items();
+        assert_eq!(rules.len(), 1);
         let h = html(
             std::slice::from_ref(&issue),
             std::slice::from_ref(&entry),
