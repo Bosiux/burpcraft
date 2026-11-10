@@ -433,8 +433,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn round_trip() {
+    /// A project touching every saved section; also the content of the format fixtures.
+    fn sample() -> App {
         let mut a = App::blank(crate::proxy::Shared::new());
         {
             let mut s = a.state.lock().unwrap();
@@ -469,6 +469,12 @@ mod tests {
         );
         a.organizer.items.push((entry(3), 1, "todo".into()));
         a.comparer.items.push("one".into());
+        a
+    }
+
+    #[test]
+    fn round_trip() {
+        let mut a = sample();
         let dir =
             std::env::temp_dir().join(format!("burpcraft-project-test-{}", std::process::id()));
         let path = dir.join("p.burpcraft");
@@ -529,5 +535,29 @@ mod tests {
         assert!(decode(&mut b, truncated).is_err());
         assert_eq!(b.state.lock().unwrap().history.len(), 2);
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    /// Files saved by released versions must keep opening to the same state. A format change adds
+    /// migration code, never edits these fixtures; each release adds its own
+    /// (`BURPCRAFT_WRITE_FIXTURE=1 cargo test fixtures` writes the current version's).
+    #[test]
+    fn fixtures_from_released_versions_open() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+        let current = dir.join(format!("project-{}.burpcraft", env!("CARGO_PKG_VERSION")));
+        if std::env::var_os("BURPCRAFT_WRITE_FIXTURE").is_some() {
+            save(&mut sample(), &current).unwrap();
+        }
+        let mut seen = 0;
+        for f in std::fs::read_dir(&dir).unwrap().flatten() {
+            let mut b = App::blank(crate::proxy::Shared::new());
+            open(&mut b, &f.path()).unwrap_or_else(|e| panic!("{}: {e}", f.path().display()));
+            assert!(
+                encode(&b) == encode(&sample()),
+                "{} decodes differently",
+                f.path().display()
+            );
+            seen += 1;
+        }
+        assert!(seen > 0, "no fixtures in {}", dir.display());
     }
 }
