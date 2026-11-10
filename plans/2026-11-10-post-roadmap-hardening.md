@@ -112,17 +112,24 @@ The goal is frequent, small, reviewed merges, not commit count: one PR per check
 | F4 BApp SHA-256 + https store | #32 | merged |
 | Crash log (panic hook) | #34 | merged |
 | AI explainer redacts credentials | #35 | merged |
-| e2e suites in CI (Linux, xvfb) | #33 | queued |
-| MSRV 1.95 + CI job | #37 | queued |
-| Parser fuzzing; 5 panics on hostile input fixed (dechunk, ws_frames, multipart points, hex/html decode) | #38 | queued |
-| Project-file fixture per release | #39 | queued |
-| Docker image for burpcraft-server | #40 | queued |
-| Performance baseline test | #41 | queued |
+| e2e suites in CI (Linux, xvfb) | #33 | merged |
+| MSRV 1.95 + CI job | #37 | merged |
+| Parser fuzzing; 5 panics on hostile input fixed (dechunk, ws_frames, multipart points, hex/html decode) | #38 | merged |
+| Project-file fixture per release | #39 | merged |
+| Docker image for burpcraft-server | #40 | merged |
+| Performance baseline test | #41 | merged |
+| Coverage floor 55 % lines | #44 | merged |
+| Decoder round-trip properties | #45 | merged |
+| Passive findings repeated per audit payload (77 → 9 on one page) | #42 | merged |
+| Headless `burpcraft scan` + SARIF 2.1.0 | #43 | merged |
+| CHANGELOG | #46 | merged |
+| Threat model | ADR 0001 (docs branch) | done |
+| `unwrap` audit of trust-boundary modules | — | done: all remaining are mutex locks or code-local invariants; input-driven ones were the 5 fuzz findings |
 | Repo settings: private vulnerability reporting, secret scanning + push protection, Dependabot alerts + security fixes, auto-merge | — | done |
 
-Still open: mandatory REST/MCP tokens (breaking: needs a decision), `unwrap` reduction in trust-boundary modules,
-coverage ratchet, threat-model ADR, CHANGELOG, macOS notarization / Windows signing (need signing secrets),
-headless CLI + SARIF, publishing the Docker image, remaining ROADMAP big bets.
+Still open: mandatory REST/MCP tokens (breaking: needs a decision), macOS notarization / Windows signing (need
+signing secrets), publishing the Docker image to GHCR, a 0.2.0 release, remaining ROADMAP big bets (browser crawl,
+FP confirmation, incremental project files, GraphQL, JWT, WS fuzzing).
 
 ## Performance baseline (Apple Silicon, release, `cargo test --release perf -- --ignored --nocapture`)
 
