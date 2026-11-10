@@ -70,6 +70,32 @@ jobs:
         env:
           BURPCRAFT_CHROME: ${{ steps.chrome.outputs.chrome-path }}
 
+  e2e:
+    name: End-to-end (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      # the app is a GUI: a virtual X display plus Mesa's software Vulkan/GL for wgpu
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends xvfb mesa-vulkan-drivers libegl1 libgl1 libxkbcommon-x11-0
+      - run: cargo build --locked
+      - name: Proxy e2e (e2e.py)
+        run: |
+          export HOME="$RUNNER_TEMP/home" && mkdir -p "$HOME"
+          xvfb-run -a target/debug/burpcraft > "$RUNNER_TEMP/app.log" 2>&1 &
+          for i in $(seq 1 100); do nc -z 127.0.0.1 8080 && break; sleep 0.3; done
+          python3 e2e.py
+          pkill -f target/debug/burpcraft || true
+      # own ports, so a leftover app from the step above can never answer in its place
+      - name: Scanner / REST / MCP e2e (e2e_scan.py)
+        run: xvfb-run -a python3 e2e_scan.py --launch target/debug/burpcraft
+        env: { E2E_PROXY: "18080", E2E_API: "11337", E2E_MCP: "11338" }
+      - if: failure()
+        run: cat "$RUNNER_TEMP/app.log" || true
+
   audit:
     name: Security audit
     runs-on: ubuntu-latest
@@ -85,7 +111,7 @@ jobs:
   ci-ok:
     name: CI OK
     if: always()
-    needs: [fmt, clippy, test, audit]
+    needs: [fmt, clippy, test, e2e, audit]
     runs-on: ubuntu-latest
     steps:
       - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
