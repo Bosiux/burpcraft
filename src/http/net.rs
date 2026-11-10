@@ -232,7 +232,7 @@ pub fn client_config() -> Arc<rustls::ClientConfig> {
 
 /// HTTPS with full certificate verification (Mozilla roots), for BurpCraft's own calls that carry
 /// secrets (API keys) - unlike `connect`, which must accept any certificate to test targets.
-pub fn send_verified(host: &str, req: &[u8]) -> io::Result<Vec<u8>> {
+pub fn send_verified(host: &str, port: u16, req: &[u8]) -> io::Result<Vec<u8>> {
     static CFG: OnceLock<Arc<rustls::ClientConfig>> = OnceLock::new();
     let cfg = CFG
         .get_or_init(|| {
@@ -248,7 +248,7 @@ pub fn send_verified(host: &str, req: &[u8]) -> io::Result<Vec<u8>> {
             Arc::new(c)
         })
         .clone();
-    let tcp = TcpStream::connect((host, 443))?;
+    let tcp = TcpStream::connect((host, port))?;
     tcp.set_read_timeout(Some(Duration::from_secs(300)))?;
     let conn =
         rustls::ClientConnection::new(cfg, ServerName::try_from(host.to_string()).map_err(io_err)?)

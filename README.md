@@ -91,6 +91,11 @@ cargo run -p burpcraft-server -- --domain oast.example.com --public-ip 203.0.113
 
 Then set the server in the **Collaborator** tab (or click **Start built-in server**).
 
+`--bapps DIR` serves `DIR/catalog.tsv`, one BApp per line: name, version, description, file and the file's
+SHA-256 (`shasum -a 256 <file>`), tab-separated. BurpCraft refuses entries without a hash and files that do not
+match it. Behind a TLS reverse proxy, enter the store as `https://host` in **Extensions → BApp Store** so the
+catalogue itself cannot be swapped in transit.
+
 ## REST API
 
 ```sh

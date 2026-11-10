@@ -1,2 +1,2 @@
-Secret finder	1.0	Flags responses that leak API keys, private keys or AWS credentials	secret-finder.py
-Request tagger	1.0	Adds an X-Pentest header to every proxied request so testers' traffic is identifiable	request-tagger.py
+Secret finder	1.0	Flags responses that leak API keys, private keys or AWS credentials	secret-finder.py	11c6edda63195c9af0b1258c782e6ef96aca0a7a39b6ebd616df35c81737f254
+Request tagger	1.0	Adds an X-Pentest header to every proxied request so testers' traffic is identifiable	request-tagger.py	05317a0bc869a1e76d791106bbf46fec3469aa9eb1f92fbb0eb9949b4f5128ef
