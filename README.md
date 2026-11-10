@@ -133,7 +133,8 @@ cargo test --workspace     # unit and local end-to-end tests (vulnerable test ap
 python3 e2e.py             # proxy end-to-end checks against local HTTP and WebSocket servers
 ```
 
-See [ROADMAP.md](ROADMAP.md) for what is done and what is not covered yet.
+See [ROADMAP.md](ROADMAP.md) for what is done and what is not covered yet, [CONTRIBUTING.md](CONTRIBUTING.md) to
+send a change and [SECURITY.md](SECURITY.md) to report a vulnerability.
 
 ## Releases
 
