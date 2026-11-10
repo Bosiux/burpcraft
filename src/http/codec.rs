@@ -221,4 +221,35 @@ mod tests {
         assert_eq!(hex_decode("41 42"), Some(b"AB".to_vec()));
         assert_eq!(hash("SHA-256", b"").len(), 64);
     }
+
+    /// decode(encode(x)) == x for every encoder the Decoder chains, over all byte values and lengths.
+    #[test]
+    fn roundtrip_properties() {
+        let mut seed = 0x2545_F491u32;
+        let inputs: Vec<Vec<u8>> = (0..300)
+            .map(|len| {
+                (0..len)
+                    .map(|_| {
+                        seed ^= seed << 13;
+                        seed ^= seed >> 17;
+                        seed ^= seed << 5;
+                        seed as u8
+                    })
+                    .collect()
+            })
+            .chain([(0..=255).collect()])
+            .collect();
+        for b in &inputs {
+            assert_eq!(base64_decode(&base64_encode(b)).as_ref(), Some(b));
+            assert_eq!(&hex_decode(&hex_encode(b)).unwrap(), b);
+            for all in [false, true] {
+                assert_eq!(&url_decode(&url_encode(b, all)), b);
+            }
+            // HTML works on text: compare with the lossy UTF-8 view the encoder sees
+            let text = String::from_utf8_lossy(b);
+            for all in [false, true] {
+                assert_eq!(html_decode(&html_encode(b, all)), text, "{b:?}");
+            }
+        }
+    }
 }
