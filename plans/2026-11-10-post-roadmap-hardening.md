@@ -1,6 +1,6 @@
 # Post-roadmap plan: stable, secure, faster
 
-Date: 2026-11-10 · Baseline: `main` @ 00fe0ea (0.1.0, 26 PRs, ~20.8k lines of Rust, 76 `#[test]`)
+Date: 2026-11-10 · Baseline: `main` @ 00fe0ea · Status updated 2026-11-10 (see *Progress*) (0.1.0, 26 PRs, ~20.8k lines of Rust, 76 `#[test]`)
 
 Goal: once the ROADMAP power-ups are done, turn BurpCraft from "feature-complete" into a project people can
 trust with a CA in their browser trust store. Order: governance → security → stability → performance → features.
@@ -17,7 +17,7 @@ Missing / found while reading the code:
 | # | Finding | Where | Severity |
 |---|---|---|---|
 | F1 | No `LICENSE` file: the repo is public but not legally open source (no one may reuse or contribute safely) | repo root | blocker |
-| F2 | `main` is not protected (no required checks, force-push allowed) | GitHub settings | blocker |
+| F2 | ~~`main` is not protected~~ — false positive: a `main` ruleset already requires a PR, `CI OK` (strict) and blocks force-push/deletion; the legacy branch-protection API returned 404 | GitHub settings | — |
 | F3 | CA private key written with default umask (usually 0644): any local user/process can read the key the user's browser trusts and MITM all their TLS | `src/http/net.rs:356` | high |
 | F4 | BApp Store installs executables (`chmod 0755`) with no hash/signature check | `src/ext/store.rs:51` | high |
 | F5 | MCP / REST run unauthenticated when no token is given; MCP checks `Origin` but not `Host` (DNS rebinding with no Origin is still possible from non-browser clients; any local process can drive the proxy) | `src/mcp/server.rs`, `src/automation/rest.rs` | medium |
@@ -99,3 +99,36 @@ The goal is frequent, small, reviewed merges, not commit count: one PR per check
 - Fuzz workflow history: nightly runs, zero open crash issues.
 - Coverage and benchmark numbers in CI logs, trend not decreasing.
 - Every release has the e2e PASS table and opens all older project fixtures.
+
+## Progress (2026-11-10)
+
+| Item | PR | State |
+|---|---|---|
+| F1 license (MIT) | #27 | merged |
+| F3 CA key 0600 / dir 0700 | #28 | merged |
+| SECURITY.md, CONTRIBUTING.md, PR template | #29, #36 | merged |
+| F5 REST/MCP Host + Origin check (REST had none: CSRF-able scans) | #30 | merged |
+| Actions pinned by SHA, cargo-deny | #31 | merged |
+| F4 BApp SHA-256 + https store | #32 | merged |
+| Crash log (panic hook) | #34 | merged |
+| AI explainer redacts credentials | #35 | merged |
+| e2e suites in CI (Linux, xvfb) | #33 | queued |
+| MSRV 1.95 + CI job | #37 | queued |
+| Parser fuzzing; 5 panics on hostile input fixed (dechunk, ws_frames, multipart points, hex/html decode) | #38 | queued |
+| Project-file fixture per release | #39 | queued |
+| Docker image for burpcraft-server | #40 | queued |
+| Performance baseline test | #41 | queued |
+| Repo settings: private vulnerability reporting, secret scanning + push protection, Dependabot alerts + security fixes, auto-merge | — | done |
+
+Still open: mandatory REST/MCP tokens (breaking: needs a decision), `unwrap` reduction in trust-boundary modules,
+coverage ratchet, threat-model ADR, CHANGELOG, macOS notarization / Windows signing (need signing secrets),
+headless CLI + SARIF, publishing the Docker image, remaining ROADMAP big bets.
+
+## Performance baseline (Apple Silicon, release, `cargo test --release perf -- --ignored --nocapture`)
+
+| Scenario | Result |
+|---|---|
+| proxy, 1 client | 59 µs direct → 193 µs proxied (+134 µs), 5 191 req/s |
+| proxy, 8 clients | 210 µs → 702 µs, 11 404 req/s |
+| passive scan | 4.3 µs/entry |
+| project, 100k entries | encode 6 ms, decode 24 ms, 57.2 MB before gzip |
