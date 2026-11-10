@@ -8,6 +8,8 @@ mod http;
 mod intruder;
 mod mcp;
 mod misc;
+#[cfg(test)]
+mod perf;
 mod project;
 mod proxy;
 mod render;
