@@ -99,7 +99,7 @@ fn baseline() {
         entries.len()
     ));
 
-    let mut app = crate::App::blank(crate::proxy::Shared::new());
+    let app = crate::App::blank(crate::proxy::Shared::new());
     app.state.lock().unwrap().history = entries.iter().cycle().take(100_000).cloned().collect();
     let t = Instant::now();
     let file = crate::project::project::encode(&app);
