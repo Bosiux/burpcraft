@@ -442,11 +442,11 @@ fn intercept_rules_scope_codec() {
 #[test]
 fn http_transport() {
     let port = start(0, "t0k".into(), ctx()).unwrap();
-    let post = |extra: &str, body: &str| {
+    let send = |host: &str, extra: &str, body: &str| {
         let mut s = TcpStream::connect(("127.0.0.1", port)).unwrap();
         write!(
             s,
-            "POST /mcp HTTP/1.1\r\nHost: x\r\n{extra}Content-Length: {}\r\n\r\n{body}",
+            "POST /mcp HTTP/1.1\r\nHost: {host}\r\n{extra}Content-Length: {}\r\n\r\n{body}",
             body.len()
         )
         .unwrap();
@@ -455,8 +455,12 @@ fn http_transport() {
         r.read_line(&mut first).unwrap();
         first
     };
+    let local = format!("127.0.0.1:{port}");
+    let post = |extra: &str, body: &str| send(&local, extra, body);
     let ping = r#"{"jsonrpc":"2.0","id":1,"method":"ping"}"#;
     assert!(post("", ping).contains("401"));
+    // DNS rebinding: a page on evil.test resolved to 127.0.0.1 sends its own name as Host and no Origin
+    assert!(send("evil.test:1338", "Authorization: Bearer t0k\r\n", ping).contains("403"));
     assert!(
         post(
             "Authorization: Bearer t0k\r\nOrigin: https://evil.test\r\n",
