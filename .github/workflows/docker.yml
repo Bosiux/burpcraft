@@ -1,0 +1,27 @@
+name: Docker
+
+# the burpcraft-server image keeps building; nothing is pushed
+on:
+  pull_request:
+    paths: [Dockerfile, .dockerignore, server/**, Cargo.lock, .github/workflows/docker.yml]
+  push:
+    branches: [main]
+    paths: [Dockerfile, .dockerignore, server/**, Cargo.lock, .github/workflows/docker.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: burpcraft-server image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - run: docker build -t burpcraft-server .
+      - name: Smoke test
+        run: |
+          docker run -d --name bcs -p 8053:8053 burpcraft-server
+          for i in $(seq 1 20); do curl -s -o /dev/null http://127.0.0.1:8053/ && break; sleep 0.5; done
+          test "$(docker inspect bcs --format '{{.Config.User}}')" = "65532"
+          curl -sf -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8053/ || true
+          docker logs bcs | grep -q "BurpCraft Collaborator on 0.0.0.0"
