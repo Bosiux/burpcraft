@@ -147,6 +147,10 @@ never downloads or installs anything and sends nothing beyond that request. Beta
 - **Stable**: bump `version` in `Cargo.toml`, merge to `main`, then `git tag vX.Y.Z && git push origin vX.Y.Z`.
 - **Beta**: *Actions → Release → Run workflow* on any branch publishes `vX.Y.Z-beta.N` as a pre-release (never `latest`).
 
+## License
+
+[MIT](LICENSE).
+
 ---
 
 <p align="center">
