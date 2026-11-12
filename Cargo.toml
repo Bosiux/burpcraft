@@ -34,7 +34,7 @@ eframe = { version = "0.37", default-features = false, features = ["x11", "wayla
 
 # native menu bar at the top of the screen (Windows/Linux keep the in-window egui one)
 [target.'cfg(target_os = "macos")'.dependencies]
-muda = { version = "0.17", default-features = false }
+muda = { version = "0.21", default-features = false }
 
 [workspace]
 members = ["server"]
